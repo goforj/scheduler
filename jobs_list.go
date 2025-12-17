@@ -46,26 +46,26 @@ func (j *JobBuilder) getJobsList() []*jobEntry {
 
 	for _, job := range jobs {
 		meta := metadata[job.ID()]
-		schedule := meta.schedule
-		scheduleType := meta.scheduleType
-		targetKind := meta.targetKind
-		target := meta.command
+		schedule := meta.Schedule
+		scheduleType := jobScheduleKind(meta.ScheduleType)
+		targetKind := jobTargetKind(meta.TargetKind)
+		target := meta.Command
 		if target == "" {
-			target = meta.handler
+			target = meta.Handler
 		}
 
 		name := job.Name()
 		if name == "" {
-			name = meta.name
+			name = meta.Name
 		}
 		tags := job.Tags()
-		if len(tags) == 0 && len(meta.tags) > 0 {
-			tags = meta.tags
+		if len(tags) == 0 && len(meta.Tags) > 0 {
+			tags = meta.Tags
 		}
 
-		if targetKind == jobTargetFunction && meta.handler != "" {
+		if targetKind == jobTargetFunction && meta.Handler != "" {
 			if name == "" || strings.Contains(name, "/") || strings.Contains(name, "(*") {
-				name = meta.handler
+				name = meta.Handler
 			}
 		}
 
@@ -104,6 +104,20 @@ func (j *JobBuilder) getJobsList() []*jobEntry {
 }
 
 // PrintJobsList renders and prints the scheduler job table to stdout.
+// @group Diagnostics
+//
+// Example: print current jobs
+//
+//	s, _ := gocron.NewScheduler()
+//	s.Start()
+//	defer s.Shutdown()
+//
+//	scheduler.NewJobBuilder(s).
+//		EverySecond().
+//		Name("heartbeat").
+//		Do(func() {})
+//
+//	scheduler.NewJobBuilder(s).PrintJobsList()
 func (j *JobBuilder) PrintJobsList() {
 	entries := j.getJobsList()
 	rows := jobEntriesToRows(entries)

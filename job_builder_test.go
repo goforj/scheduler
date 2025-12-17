@@ -158,13 +158,13 @@ func TestCommandMetadataAndRunNowSkipsExec(t *testing.T) {
 	meta := f.JobMetadata()
 	require.Len(t, meta, 1)
 	for _, v := range meta {
-		require.Equal(t, jobTargetCommand, v.targetKind)
-		require.Equal(t, "hello:world foo bar", v.command)
-		require.Equal(t, jobScheduleCron, v.scheduleType)
-		require.Equal(t, "0 0 * * *", v.schedule)
-		require.Contains(t, v.tags, "env=test")
-		require.Contains(t, v.tags, "cron=0 0 * * *")
-		require.Contains(t, v.tags, "args=\"foo bar\"")
+		require.Equal(t, string(jobTargetCommand), v.TargetKind)
+		require.Equal(t, "hello:world foo bar", v.Command)
+		require.Equal(t, string(jobScheduleCron), v.ScheduleType)
+		require.Equal(t, "0 0 * * *", v.Schedule)
+		require.Contains(t, v.Tags, "env=test")
+		require.Contains(t, v.Tags, "cron=0 0 * * *")
+		require.Contains(t, v.Tags, "args=\"foo bar\"")
 	}
 }
 
@@ -183,10 +183,10 @@ func TestCommandNoArgsMetadataAndReset(t *testing.T) {
 	meta := f.JobMetadata()
 	require.Len(t, meta, 1)
 	for _, v := range meta {
-		require.Equal(t, "hello:world", v.command)
-		require.Equal(t, jobScheduleCron, v.scheduleType)
-		require.Equal(t, "0 0 * * *", v.schedule)
-		require.Contains(t, v.tags, "env=test")
+		require.Equal(t, "hello:world", v.Command)
+		require.Equal(t, string(jobScheduleCron), v.ScheduleType)
+		require.Equal(t, "0 0 * * *", v.Schedule)
+		require.Contains(t, v.Tags, "env=test")
 	}
 
 	require.Equal(t, "", f.CronExpr())
@@ -210,8 +210,8 @@ func TestFunctionMetadataFriendlyNameAndRetainState(t *testing.T) {
 	meta := f.JobMetadata()
 	require.Len(t, meta, 1)
 	for _, v := range meta {
-		require.Equal(t, jobTargetFunction, v.targetKind)
-		require.Equal(t, "scheduler.TestFunctionMetadataFriendlyNameAndRetainState (anon func)", v.handler)
+		require.Equal(t, string(jobTargetFunction), v.TargetKind)
+		require.Equal(t, "scheduler.TestFunctionMetadataFriendlyNameAndRetainState (anon func)", v.Handler)
 	}
 
 	f.Do(fn)
@@ -233,12 +233,12 @@ func TestIntervalMetadataAndTags(t *testing.T) {
 	meta := f.JobMetadata()
 	require.Len(t, meta, 1)
 	for _, v := range meta {
-		require.Equal(t, jobScheduleInterval, v.scheduleType)
-		require.Equal(t, "1s", v.schedule)
-		require.Equal(t, jobTargetFunction, v.targetKind)
-		require.Equal(t, "scheduler.sampleHandler", v.handler)
-		require.Contains(t, v.tags, "env=test")
-		require.Contains(t, v.tags, "interval=1s")
+		require.Equal(t, string(jobScheduleInterval), v.ScheduleType)
+		require.Equal(t, "1s", v.Schedule)
+		require.Equal(t, string(jobTargetFunction), v.TargetKind)
+		require.Equal(t, "scheduler.sampleHandler", v.Handler)
+		require.Contains(t, v.Tags, "env=test")
+		require.Contains(t, v.Tags, "interval=1s")
 	}
 }
 
@@ -253,14 +253,14 @@ func TestJobMetadataCopyIsDefensive(t *testing.T) {
 
 	first := f.JobMetadata()
 	for id := range first {
-		first[id] = jobMetadata{handler: "tampered"}
+		first[id] = JobMetadata{Handler: "tampered"}
 		delete(first, id)
 	}
 
 	second := f.JobMetadata()
 	require.Len(t, second, 1)
 	for _, v := range second {
-		require.Equal(t, "scheduler.sampleHandler", v.handler)
+		require.Equal(t, "scheduler.sampleHandler", v.Handler)
 	}
 }
 
@@ -444,10 +444,10 @@ func TestRecordJobFallbacks(t *testing.T) {
 	meta := f.JobMetadata()
 	require.Len(t, meta, 1)
 	for _, v := range meta {
-		require.Equal(t, "cmd", v.name)
-		require.Equal(t, "cmd a", v.command)
-		require.Equal(t, jobScheduleInterval, v.scheduleType)
-		require.Equal(t, "1s", v.schedule)
+		require.Equal(t, "cmd", v.Name)
+		require.Equal(t, "cmd a", v.Command)
+		require.Equal(t, string(jobScheduleInterval), v.ScheduleType)
+		require.Equal(t, "1s", v.Schedule)
 	}
 }
 
@@ -637,8 +637,8 @@ func TestTimezoneAppliedToCron(t *testing.T) {
 	meta := f.JobMetadata()
 	require.Len(t, meta, 1)
 	for _, v := range meta {
-		require.Equal(t, jobScheduleCron, v.scheduleType)
-		require.Contains(t, v.schedule, "CRON_TZ=America/Chicago")
+		require.Equal(t, string(jobScheduleCron), v.ScheduleType)
+		require.Contains(t, v.Schedule, "CRON_TZ=America/Chicago")
 	}
 }
 

@@ -388,6 +388,18 @@ func writeMain(base string, fd *FuncDoc, importPath string) error {
 		if strings.Contains(ex.Code, "os.") {
 			imports["os"] = true
 		}
+		if strings.Contains(ex.Code, "context.") {
+			imports["context"] = true
+		}
+		if strings.Contains(ex.Code, "time.") {
+			imports["time"] = true
+		}
+		if strings.Contains(ex.Code, "gocron") {
+			imports["github.com/go-co-op/gocron/v2"] = true
+		}
+		if strings.Contains(ex.Code, "scheduler") {
+			imports["github.com/goforj/scheduler"] = true
+		}
 		if strings.Contains(ex.Code, "filepath.") {
 			imports["path/filepath"] = true
 		}
