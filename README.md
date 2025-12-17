@@ -46,7 +46,7 @@ scheduler.NewJobBuilder(s).
     Do(func() {
     generateReports()
 })
-``
+```
 
 ## Runnable examples
 
