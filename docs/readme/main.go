@@ -468,7 +468,7 @@ func updateTestsSection(readme string, tests int) (string, error) {
 		leading = "\n"
 	}
 
-	badge := fmt.Sprintf("%s    <img src=\"https://img.shields.io/badge/test%%20count-%d-brightgreen\" alt=\"Tests\">\n", leading, tests)
+	badge := fmt.Sprintf("%s    <img src=\"https://img.shields.io/badge/tests-%d-brightgreen\" alt=\"Tests\">\n", leading, tests)
 
 	return before + badge + after, nil
 }
