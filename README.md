@@ -13,6 +13,9 @@
     <a href="https://golang.org"><img src="https://img.shields.io/badge/go-1.18+-blue?logo=go" alt="Go version"></a>
     <img src="https://img.shields.io/github/v/tag/goforj/scheduler?label=version&sort=semver" alt="Latest tag">
     <a href="https://codecov.io/gh/goforj/scheduler" ><img src="https://codecov.io/github/goforj/scheduler/graph/badge.svg?token=9KT46ZORP3"/></a>
+<!-- test-count:embed:start -->
+    <img src="https://img.shields.io/badge/test%20-count-183-brightgreen" alt="Tests">
+<!-- test-count:embed:end -->
     <a href="https://goreportcard.com/report/github.com/goforj/scheduler"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler" alt="Go Report Card"></a>
 </p>
 
