@@ -40,6 +40,10 @@ func (j *JobBuilder) getJobsList() []*jobEntry {
 		return nil
 	}
 
+	if ad, ok := j.scheduler.(gocronSchedulerAdapter); ok && ad.s == nil {
+		return nil
+	}
+
 	jobs := j.scheduler.Jobs()
 	metadata := j.JobMetadata()
 	var entries []*jobEntry
@@ -120,6 +124,10 @@ func (j *JobBuilder) getJobsList() []*jobEntry {
 //	scheduler.NewJobBuilder(s).PrintJobsList()
 func (j *JobBuilder) PrintJobsList() {
 	entries := j.getJobsList()
+	if len(entries) == 0 {
+		fmt.Println("No jobs registered.")
+		return
+	}
 	rows := jobEntriesToRows(entries)
 
 	headerStyle := lipgloss.NewStyle().

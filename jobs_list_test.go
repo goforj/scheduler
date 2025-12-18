@@ -91,3 +91,20 @@ func TestPrintJobsList(t *testing.T) {
 	require.Contains(t, out, "Scheduler Jobs")
 	require.Contains(t, out, "hello:world")
 }
+
+func TestPrintJobsListEmpty(t *testing.T) {
+	// Capture stdout
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+	stdout := os.Stdout
+	defer func() { os.Stdout = stdout }()
+	os.Stdout = w
+
+	NewJobBuilder(nil).PrintJobsList()
+
+	require.NoError(t, w.Close())
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	require.Contains(t, out, "No jobs registered.")
+}
