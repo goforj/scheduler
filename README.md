@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./docs/images/logo.png?v=2" width="400" alt="scheduler logo">
+  <img src="./docs/images/logo.png?v=2" width="300" alt="scheduler logo">
 </p>
 
 <p align="center">
