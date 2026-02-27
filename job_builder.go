@@ -1701,9 +1701,9 @@ type CacheLocker struct {
 //	redisStore := rediscache.New(rediscache.Config{
 //		Addr: "127.0.0.1:6379",
 //	})
-//	client := cache.NewCache(redisStore)
-//	locker := scheduler.NewCacheLocker(client, 10*time.Minute)
-//	_, _ = locker.Lock(context.Background(), "job")
+//	redisClient := cache.NewCache(redisStore)
+//	redisLocker := scheduler.NewCacheLocker(redisClient, 10*time.Minute)
+//	_, _ = redisLocker.Lock(context.Background(), "job")
 func NewCacheLocker(client cache.LockAPI, ttl time.Duration) *CacheLocker {
 	return &CacheLocker{client: client, ttl: ttl}
 }

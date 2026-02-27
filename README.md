@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/github/v/tag/goforj/scheduler?label=version&sort=semver" alt="Latest tag">
     <a href="https://codecov.io/gh/goforj/scheduler" ><img src="https://codecov.io/github/goforj/scheduler/graph/badge.svg?token=9KT46ZORP3"/></a>
 <!-- test-count:embed:start -->
-    <img src="https://img.shields.io/badge/tests-191-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-196-brightgreen" alt="Tests">
 <!-- test-count:embed:end -->
     <a href="https://goreportcard.com/report/github.com/goforj/scheduler"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler" alt="Go Report Card"></a>
 </p>
@@ -112,7 +112,7 @@ This guarantees all examples are valid, up-to-date, and remain functional as the
 | **Execution** | [RunInBackground](#runinbackground) |
 | **Filters** | [Between](#between) [Days](#days) [Environments](#environments) [Fridays](#fridays) [Mondays](#mondays) [Saturdays](#saturdays) [Skip](#skip) [Sundays](#sundays) [Thursdays](#thursdays) [Tuesdays](#tuesdays) [UnlessBetween](#unlessbetween) [Wednesdays](#wednesdays) [Weekdays](#weekdays) [Weekends](#weekends) [When](#when) |
 | **Hooks** | [After](#after) [Before](#before) [OnFailure](#onfailure) [OnSuccess](#onsuccess) |
-| **Locking** | [NewRedisLocker](#newredislocker) |
+| **Locking** | [NewCacheLocker](#newcachelocker) [NewRedisLocker](#newredislocker) |
 | **Metadata** | [JobMetadata](#jobmetadata) [Name](#name) |
 | **Scheduling** | [Cron](#cron) [Daily](#daily) [DailyAt](#dailyat) [DaysOfMonth](#daysofmonth) [Do](#do) [Every](#every) [EveryFifteenMinutes](#everyfifteenminutes) [EveryFifteenSeconds](#everyfifteenseconds) [EveryFiveMinutes](#everyfiveminutes) [EveryFiveSeconds](#everyfiveseconds) [EveryFourHours](#everyfourhours) [EveryFourMinutes](#everyfourminutes) [EveryMinute](#everyminute) [EveryOddHour](#everyoddhour) [EverySecond](#everysecond) [EverySixHours](#everysixhours) [EveryTenMinutes](#everytenminutes) [EveryTenSeconds](#everytenseconds) [EveryThirtyMinutes](#everythirtyminutes) [EveryThirtySeconds](#everythirtyseconds) [EveryThreeHours](#everythreehours) [EveryThreeMinutes](#everythreeminutes) [EveryTwentySeconds](#everytwentyseconds) [EveryTwoHours](#everytwohours) [EveryTwoMinutes](#everytwominutes) [EveryTwoSeconds](#everytwoseconds) [Hourly](#hourly) [HourlyAt](#hourlyat) [Hours](#hours) [LastDayOfMonth](#lastdayofmonth) [Minutes](#minutes) [Monthly](#monthly) [MonthlyOn](#monthlyon) [Quarterly](#quarterly) [QuarterlyOn](#quarterlyon) [Seconds](#seconds) [TwiceDaily](#twicedaily) [TwiceDailyAt](#twicedailyat) [TwiceMonthly](#twicemonthly) [Weekly](#weekly) [WeeklyOn](#weeklyon) [Yearly](#yearly) [YearlyOn](#yearlyon) |
 | **State management** | [RetainState](#retainstate) |
@@ -487,9 +487,38 @@ scheduler.NewJobBuilder(nil).
 
 ## Locking
 
+### <a id="newcachelocker"></a>NewCacheLocker
+
+NewCacheLocker creates a CacheLocker with a cache lock client and TTL.
+The ttl is a lease duration: when it expires, another worker may acquire the
+same lock key. For long-running jobs, choose ttl >= worst-case runtime plus a
+safety buffer. If your runtime can exceed ttl, prefer a renewing/heartbeat lock strategy.
+
+_Example: use an in-memory cache driver_
+
+```go
+client := cache.NewCache(cache.NewMemoryStore(context.Background()))
+locker := scheduler.NewCacheLocker(client, 10*time.Minute)
+_, _ = locker.Lock(context.Background(), "job")
+```
+
+_Example: use the Redis cache driver_
+
+```go
+redisStore := rediscache.New(rediscache.Config{
+	Addr: "127.0.0.1:6379",
+})
+redisClient := cache.NewCache(redisStore)
+redisLocker := scheduler.NewCacheLocker(redisClient, 10*time.Minute)
+_, _ = redisLocker.Lock(context.Background(), "job")
+```
+
 ### <a id="newredislocker"></a>NewRedisLocker
 
 NewRedisLocker creates a RedisLocker with a client and TTL.
+The ttl is a lease duration: when it expires, another worker may acquire the
+same lock key. For long-running jobs, choose ttl >= worst-case runtime plus a
+safety buffer. If your runtime can exceed ttl, prefer a renewing/heartbeat lock strategy.
 
 ```go
 client := redis.NewClient(&redis.Options{}) // replace with your client

@@ -52,7 +52,7 @@ func TestJobsListHelpers(t *testing.T) {
 
 	require.Contains(t, renderNextRunWithWidth(time.Time{}, nil, 5), "-")
 	require.Contains(t, renderNextRunWithWidth(next, nil, 8), "in")
-	require.Contains(t, renderNextRunWithWidth(next, nil, 8), "Dec")
+	require.Contains(t, renderNextRunWithWidth(next, nil, 8), shortTimestamp(next))
 	require.Contains(t, renderJobType(jobTargetCommand), "command")
 
 	require.Equal(t, "in 59s", humanizeDuration(59*time.Second))
