@@ -391,6 +391,12 @@ func writeMain(base string, fd *FuncDoc, importPath string) error {
 		if strings.Contains(ex.Code, "context.") {
 			imports["context"] = true
 		}
+		if strings.Contains(ex.Code, "cache.") {
+			imports["github.com/goforj/cache"] = true
+		}
+		if strings.Contains(ex.Code, "rediscache.") {
+			imports["github.com/goforj/cache/driver/rediscache"] = true
+		}
 		if strings.Contains(ex.Code, "redis.") {
 			imports["github.com/redis/go-redis/v9"] = true
 		}

@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"fmt"
+	"github.com/goforj/cache"
 	"github.com/redis/go-redis/v9"
 	"os"
 	"os/exec"
@@ -1676,6 +1677,57 @@ func (f LockFunc) Unlock(ctx context.Context) error {
 	return f(ctx)
 }
 
+// CacheLocker adapts a cache lock API to gocron.Locker.
+// It uses a single key per job and auto-expires after ttl.
+type CacheLocker struct {
+	client cache.LockAPI
+	ttl    time.Duration
+}
+
+// NewCacheLocker creates a CacheLocker with a cache lock client and TTL.
+// The ttl is a lease duration: when it expires, another worker may acquire the
+// same lock key. For long-running jobs, choose ttl >= worst-case runtime plus a
+// safety buffer. If your runtime can exceed ttl, prefer a renewing/heartbeat lock strategy.
+// @group Locking
+//
+// Example: use an in-memory cache driver
+//
+//	client := cache.NewCache(cache.NewMemoryStore(context.Background()))
+//	locker := scheduler.NewCacheLocker(client, 10*time.Minute)
+//	_, _ = locker.Lock(context.Background(), "job")
+//
+// Example: use the Redis cache driver
+//
+//	redisStore := rediscache.New(rediscache.Config{
+//		Addr: "127.0.0.1:6379",
+//	})
+//	client := cache.NewCache(redisStore)
+//	locker := scheduler.NewCacheLocker(client, 10*time.Minute)
+//	_, _ = locker.Lock(context.Background(), "job")
+func NewCacheLocker(client cache.LockAPI, ttl time.Duration) *CacheLocker {
+	return &CacheLocker{client: client, ttl: ttl}
+}
+
+// Lock obtains a lock for the job name using the cache lock API.
+// @group Locking
+func (l *CacheLocker) Lock(ctx context.Context, key string) (gocron.Lock, error) {
+	locked, err := l.client.TryLockCtx(ctx, l.lockKey(key), l.ttl)
+	if err != nil {
+		return nil, err
+	}
+	if !locked {
+		return nil, errLockNotAcquired
+	}
+	return &cacheLock{
+		client: l.client,
+		key:    l.lockKey(key),
+	}, nil
+}
+
+func (l *CacheLocker) lockKey(name string) string {
+	return "gocron:lock:" + name
+}
+
 // RedisLocker is a simple gocron Locker backed by redis NX locks.
 // It uses a single key per job and auto-expires after ttl.
 type RedisLocker struct {
@@ -1684,12 +1736,15 @@ type RedisLocker struct {
 }
 
 // NewRedisLocker creates a RedisLocker with a client and TTL.
+// The ttl is a lease duration: when it expires, another worker may acquire the
+// same lock key. For long-running jobs, choose ttl >= worst-case runtime plus a
+// safety buffer. If your runtime can exceed ttl, prefer a renewing/heartbeat lock strategy.
 // @group Locking
 //
 // Example: create a redis-backed locker
 //
 //	client := redis.NewClient(&redis.Options{}) // replace with your client
-//	locker := scheduler.NewRedisLocker(client, time.Minute)
+//	locker := scheduler.NewRedisLocker(client, 10*time.Minute)
 //	_, _ = locker.Lock(context.Background(), "job")
 func NewRedisLocker(client redisLockerClient, ttl time.Duration) *RedisLocker {
 	return &RedisLocker{client: client, ttl: ttl}
@@ -1701,7 +1756,7 @@ func NewRedisLocker(client redisLockerClient, ttl time.Duration) *RedisLocker {
 // Example: acquire a lock
 //
 //	client := redis.NewClient(&redis.Options{})
-//	locker := scheduler.NewRedisLocker(client, time.Minute)
+//	locker := scheduler.NewRedisLocker(client, 10*time.Minute)
 //	lock, _ := locker.Lock(context.Background(), "job")
 //	_ = lock.Unlock(context.Background())
 func (l *RedisLocker) Lock(ctx context.Context, key string) (gocron.Lock, error) {
@@ -1726,6 +1781,15 @@ func (l *RedisLocker) lockKey(name string) string {
 type redisLock struct {
 	client redisLockerClient
 	key    string
+}
+
+type cacheLock struct {
+	client cache.LockAPI
+	key    string
+}
+
+func (l *cacheLock) Unlock(ctx context.Context) error {
+	return l.client.UnlockCtx(ctx, l.key)
 }
 
 // Unlock releases the redis-backed lock.

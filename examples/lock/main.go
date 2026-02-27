@@ -15,7 +15,7 @@ func main() {
 
 	// Example: acquire a lock
 	client := redis.NewClient(&redis.Options{})
-	locker := scheduler.NewRedisLocker(client, time.Minute)
+	locker := scheduler.NewRedisLocker(client, 10*time.Minute)
 	lock, _ := locker.Lock(context.Background(), "job")
 	_ = lock.Unlock(context.Background())
 }

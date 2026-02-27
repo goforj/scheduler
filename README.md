@@ -126,7 +126,7 @@ Lock invokes the underlying function.
 
 ```go
 client := redis.NewClient(&redis.Options{})
-locker := scheduler.NewRedisLocker(client, time.Minute)
+locker := scheduler.NewRedisLocker(client, 10*time.Minute)
 lock, _ := locker.Lock(context.Background(), "job")
 _ = lock.Unlock(context.Background())
 ```
@@ -493,7 +493,7 @@ NewRedisLocker creates a RedisLocker with a client and TTL.
 
 ```go
 client := redis.NewClient(&redis.Options{}) // replace with your client
-locker := scheduler.NewRedisLocker(client, time.Minute)
+locker := scheduler.NewRedisLocker(client, 10*time.Minute)
 _, _ = locker.Lock(context.Background(), "job")
 ```
 
