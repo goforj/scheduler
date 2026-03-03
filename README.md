@@ -35,7 +35,7 @@ Go has excellent low-level scheduling libraries, but defining real-world schedul
 
 Everything remains explicit, testable, and inspectable, while staying pleasant to read and maintain.
 
-## Example
+## Quick Start
 
 Basic:
 
@@ -100,15 +100,15 @@ func main() {
 Example output:
 
 ```
-+-------------------------------------------------------------------------------------------------------------+
-| Scheduler Jobs › (3)
-+------------------+----------+----------------+-----------------------+--------------------+--------------------------+
-| Name             | Type     | Schedule       | Handler               | Next Run           | Tags                     |
-+------------------+----------+----------------+-----------------------+--------------------+--------------------------+
-| cleanup          | function | every 1m       | main.main (anon func) | in 1m Mar 3 2:16AM | env=local                |
++------------------------------------------------------------------------------------------------------------------------+
+| Scheduler Jobs › (3)                                                                                                  |
++------------------+----------+----------------+-----------------------+----------------------+--------------------------+
+| Name             | Type     | Schedule       | Handler               | Next Run             | Tags                     |
++------------------+----------+----------------+-----------------------+----------------------+--------------------------+
+| cleanup          | function | every 1m       | main.main (anon func) | in 1m Mar 3 2:16AM  | env=local                |
 | reports:generate | function | cron 30 10 * * * | main.main (anon func) | in 8h Mar 3 10:30AM | env=local                |
 | reports:purge    | command  | cron 0 0 * * * | -                     | in 21h Mar 4 12:00AM | env=local, args="--force" |
-+------------------+----------+----------------+-----------------------+--------------------+--------------------------+
++------------------+----------+----------------+-----------------------+----------------------+--------------------------+
 ```
 
 ## Runnable examples
@@ -342,7 +342,6 @@ WithoutOverlappingWithLocker ensures the job does not run concurrently across di
 locker := scheduler.LockerFunc(func(ctx context.Context, key string) (gocron.Lock, error) {
 	return scheduler.LockFunc(func(context.Context) error { return nil }), nil
 })
-
 
 scheduler.New().
 	WithoutOverlappingWithLocker(locker).

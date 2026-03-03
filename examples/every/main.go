@@ -3,7 +3,7 @@ package main
 import "github.com/goforj/scheduler"
 
 func main() {
-	// Every starts an interval chain identical to JobBuilder.Every.
+	// Every schedules a job to run every X seconds, minutes, or hours.
 
 	// Example: fluently choose an interval
 	scheduler.New().Every(10).Minutes()

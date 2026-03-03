@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	// Cron schedules a cron-based job builder.
+	// Cron sets the cron expression for the job.
 
 	// Example: configure a cron expression
 	builder := scheduler.New().Cron("15 3 * * *")
