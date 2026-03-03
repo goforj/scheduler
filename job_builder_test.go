@@ -860,7 +860,7 @@ func TestDoWithoutSchedule(t *testing.T) {
 func TestRecordJobDefaults(t *testing.T) {
 	b := newJobBuilder(nil)
 	b.targetKind = ""
-	b.jobMetadata = nil
+	b.state = nil
 
 	j := stubJob{id: uuid.New()}
 	b.recordJob(j, sampleHandler)
