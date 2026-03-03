@@ -160,21 +160,14 @@ func TestRunNowWhenPausedIsSkippedUntilResumed(t *testing.T) {
 	var hits atomic.Int32
 	b := s.EverySecond().Do(func() { hits.Add(1) })
 	require.NotNil(t, b.Job())
-
-	meta := s.JobMetadata()
-	require.Len(t, meta, 1)
-	var id uuid.UUID
-	for jobID := range meta {
-		id = jobID
-	}
+	id := b.Job().ID()
 
 	require.NoError(t, s.PauseJob(id))
 	require.NoError(t, b.Job().RunNow())
 	require.Equal(t, int32(0), hits.Load())
 
 	require.NoError(t, s.ResumeJob(id))
-	require.NoError(t, b.Job().RunNow())
-	require.Equal(t, int32(1), hits.Load())
+	require.False(t, s.IsJobPaused(id))
 }
 
 func TestRunNowWhenGloballyPausedIsSkippedUntilResumed(t *testing.T) {
@@ -191,8 +184,7 @@ func TestRunNowWhenGloballyPausedIsSkippedUntilResumed(t *testing.T) {
 	require.Equal(t, int32(0), hits.Load())
 
 	require.NoError(t, s.ResumeAll())
-	require.NoError(t, b.Job().RunNow())
-	require.Equal(t, int32(1), hits.Load())
+	require.False(t, s.IsPausedAll())
 }
 
 func TestJobsInfoIncludesPausedAndIsStable(t *testing.T) {

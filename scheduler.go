@@ -93,8 +93,6 @@ func (s *Scheduler) Jobs() []gocron.Job {
 	return s.s.Jobs()
 }
 
-// Every starts an interval chain identical to JobBuilder.Every.
-// @group Intervals
 func (s *Scheduler) Every(interval int) *FluentEvery {
 	return newJobBuilderWithState(s.s, s.JobBuilder.state).Every(interval)
 }
@@ -105,7 +103,6 @@ func (s *Scheduler) EveryDuration(interval time.Duration) *JobBuilder {
 	return newJobBuilderWithState(s.s, s.JobBuilder.state).every(interval)
 }
 
-// Cron schedules a cron-based job builder.
 func (s *Scheduler) Cron(expr string) *JobBuilder {
 	return newJobBuilderWithState(s.s, s.JobBuilder.state).Cron(expr)
 }
