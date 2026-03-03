@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"sort"
 	"sync"
 	"time"
 
@@ -112,8 +113,29 @@ func (s *runtimeState) metadataCopy() map[uuid.UUID]JobMetadata {
 	defer s.mu.RUnlock()
 	out := make(map[uuid.UUID]JobMetadata, len(s.metadata))
 	for id, meta := range s.metadata {
+		meta.Paused = s.pausedAll || s.pausedJobs[id]
 		out[id] = meta
 	}
+	return out
+}
+
+func (s *runtimeState) metadataList() []JobMetadata {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	out := make([]JobMetadata, 0, len(s.metadata))
+	for id, meta := range s.metadata {
+		meta.Paused = s.pausedAll || s.pausedJobs[id]
+		out = append(out, meta)
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name == out[j].Name {
+			return out[i].ID.String() < out[j].ID.String()
+		}
+		return out[i].Name < out[j].Name
+	})
+
 	return out
 }
 

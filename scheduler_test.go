@@ -176,3 +176,58 @@ func TestRunNowWhenPausedIsSkippedUntilResumed(t *testing.T) {
 	require.NoError(t, b.Job().RunNow())
 	require.Equal(t, int32(1), hits.Load())
 }
+
+func TestRunNowWhenGloballyPausedIsSkippedUntilResumed(t *testing.T) {
+	s, err := NewWithError()
+	require.NoError(t, err)
+	defer func() { _ = s.Stop() }()
+
+	var hits atomic.Int32
+	b := s.EverySecond().Do(func() { hits.Add(1) })
+	require.NotNil(t, b.Job())
+
+	require.NoError(t, s.PauseAll())
+	require.NoError(t, b.Job().RunNow())
+	require.Equal(t, int32(0), hits.Load())
+
+	require.NoError(t, s.ResumeAll())
+	require.NoError(t, b.Job().RunNow())
+	require.Equal(t, int32(1), hits.Load())
+}
+
+func TestJobsInfoIncludesPausedAndIsStable(t *testing.T) {
+	clock := clockwork.NewFakeClock()
+	s, err := NewWithError(gocron.WithClock(clock))
+	require.NoError(t, err)
+	defer func() { _ = s.Stop() }()
+
+	s.EverySecond().Name("b").Do(func() {})
+	s.EverySecond().Name("a").Do(func() {})
+
+	jobs := s.JobsInfo()
+	require.Len(t, jobs, 2)
+	require.Equal(t, "a", jobs[0].Name)
+	require.Equal(t, "b", jobs[1].Name)
+	for _, job := range jobs {
+		require.NotEqual(t, uuid.Nil, job.ID)
+		require.NotEmpty(t, job.TargetKind)
+		require.False(t, job.Paused)
+	}
+
+	meta := s.JobMetadata()
+	var pausedID uuid.UUID
+	for id, m := range meta {
+		if m.Name == "a" {
+			pausedID = id
+			break
+		}
+	}
+	require.NotEqual(t, uuid.Nil, pausedID)
+	require.NoError(t, s.PauseJob(pausedID))
+
+	jobs = s.JobsInfo()
+	require.Len(t, jobs, 2)
+	require.Equal(t, "a", jobs[0].Name)
+	require.True(t, jobs[0].Paused)
+	require.False(t, jobs[1].Paused)
+}

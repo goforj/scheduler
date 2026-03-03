@@ -160,6 +160,7 @@ type JobMetadata struct {
 	Handler      string
 	Command      string
 	Tags         []string
+	Paused       bool
 }
 
 // RetainState allows the job to retain its state after execution.
@@ -1302,6 +1303,7 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 
 // PauseAll pauses execution for all scheduled jobs without removing them.
 // This is universal across Do, Command, and Exec jobs.
+// RunNow calls are skipped while pause is active.
 // @group Runtime control
 //
 // Example: pause all jobs
@@ -1332,6 +1334,7 @@ func (j *JobBuilder) ResumeAll() error {
 }
 
 // PauseJob pauses execution for a specific scheduled job.
+// RunNow calls for that job are skipped while paused.
 // @group Runtime control
 //
 // Example: pause one job by ID
@@ -1416,6 +1419,26 @@ func (j *JobBuilder) JobMetadata() map[uuid.UUID]JobMetadata {
 		return map[uuid.UUID]JobMetadata{}
 	}
 	return j.state.metadataCopy()
+}
+
+// JobsInfo returns a stable, sorted snapshot of all known job metadata.
+// This is a facade-friendly list form of JobMetadata including paused state.
+// @group Metadata
+//
+// Example: iterate jobs for UI rendering
+//
+//	s := scheduler.New()
+//	s.EverySecond().Name("heartbeat").Do(func() {})
+//	for _, job := range s.JobsInfo() {
+//		_ = job.ID
+//		_ = job.Name
+//		_ = job.Paused
+//	}
+func (j *JobBuilder) JobsInfo() []JobMetadata {
+	if j.state == nil {
+		return []JobMetadata{}
+	}
+	return j.state.metadataList()
 }
 
 func (j *JobBuilder) recordJob(job gocron.Job, task func()) {
