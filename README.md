@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/github/v/tag/goforj/scheduler?label=version&sort=semver" alt="Latest tag">
     <a href="https://codecov.io/gh/goforj/scheduler" ><img src="https://codecov.io/github/goforj/scheduler/graph/badge.svg?token=9KT46ZORP3"/></a>
 <!-- test-count:embed:start -->
-    <img src="https://img.shields.io/badge/tests-196-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-204-brightgreen" alt="Tests">
 <!-- test-count:embed:end -->
     <a href="https://goreportcard.com/report/github.com/goforj/scheduler"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler" alt="Go Report Card"></a>
 </p>
@@ -37,16 +37,43 @@ Everything remains explicit, testable, and inspectable, while staying pleasant t
 
 ## Example
 
+Basic:
+
 ```go
-scheduler.NewJobBuilder(s).
-    Name("reports:generate").
-    Weekdays().
-    Between("09:00", "17:00").
-    WithoutOverlapping().
-    DailyAt("10:30").
-    Do(func() {
-    generateReports()
-})
+s := scheduler.New()
+defer s.Stop()
+
+s.EveryMinute().Name("cleanup").Do(func() { runCleanup() }) // run in-process cleanup every minute
+s.DailyAt("09:00").Weekdays().Name("reports:morning").Do(func() { sendMorningReport() }) // weekdays at 09:00
+s.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly
+s.Cron("*/15 * * * *").Exec("/usr/bin/env", "echo", "heartbeat") // run external executable every 15 minutes
+s.EveryFiveMinutes().WithoutOverlapping().Name("sync:inventory").Do(func() { syncInventory() }) // prevent overlapping runs
+s.Cron("0 * * * *").When(func() bool { return isPrimaryNode() }).Name("rebalance").Do(func() { rebalance() }) // run only when condition passes
+```
+
+Advanced (kitchen sink):
+
+```go
+s := scheduler.New()
+defer s.Stop()
+
+s.
+	Name("reports:generate").
+	Timezone("America/New_York").
+	Weekdays().
+	Between("09:00", "17:00").
+	WithoutOverlapping().
+	Before(func() { markJobStart("reports:generate") }).
+	OnSuccess(func() { notifySuccess("reports:generate") }).
+	OnFailure(func() { notifyFailure("reports:generate") }).
+	DailyAt("10:30").
+	Do(func() { generateReports() })
+
+s.
+	Name("reconcile:daily").
+	RunInBackground().
+	Cron("0 3 * * *").
+	Command("billing:reconcile", "--retry=3")
 ```
 
 ## List jobs as an ASCII table
@@ -55,36 +82,33 @@ scheduler.NewJobBuilder(s).
 package main
 
 import (
-	"github.com/go-co-op/gocron/v2"
 	"github.com/goforj/scheduler"
 )
 
 func main() {
-	s, _ := gocron.NewScheduler()
-	s.Start()
-	defer s.Shutdown()
+	s := scheduler.New()
+	defer s.Stop()
 
-	scheduler.NewJobBuilder(s).
-		EveryMinute().
-		Name("cleanup").
-		Do(func() {})
+	s.EveryMinute().Name("cleanup").Do(func() {}) // run cleanup every minute
+	s.DailyAt("10:30").Weekdays().Name("reports:generate").Do(func() {}) // run reports on weekdays at 10:30
+	s.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly at midnight
 
-	scheduler.NewJobBuilder(s).PrintJobsList()
+	s.PrintJobsList()
 }
 ```
 
 Example output:
 
 ```
-+--------------------------------------------------------------------------------------+
++-------------------------------------------------------------------------------------------------------------+
 | Scheduler Jobs › (3)
-+----------------+----------+----------------+---------+--------+----------------------+
-| Name           | Type     | Schedule       | Handler | Next   | Tags                 |
-+----------------+----------+----------------+---------+--------+----------------------+
-| hello:world    | command  | cron 0 0 * * 0 | -       | in 3d  | env=dev, args="w"    |
-| hello:world    | command  | every 1h       | -       | in 1h  | env=dev, args="hour" |
-| cleanup        | function | every 1m       | cleanup | in 1m  | env=dev              |
-+----------------+----------+----------------+---------+--------+----------------------+
++------------------+----------+----------------+-----------------------+--------------------+--------------------------+
+| Name             | Type     | Schedule       | Handler               | Next Run           | Tags                     |
++------------------+----------+----------------+-----------------------+--------------------+--------------------------+
+| cleanup          | function | every 1m       | main.main (anon func) | in 1m Mar 3 2:16AM | env=local                |
+| reports:generate | function | cron 30 10 * * * | main.main (anon func) | in 8h Mar 3 10:30AM | env=local                |
+| reports:purge    | command  | cron 0 0 * * * | -                     | in 21h Mar 4 12:00AM | env=local, args="--force" |
++------------------+----------+----------------+-----------------------+--------------------+--------------------------+
 ```
 
 ## Runnable examples
@@ -104,18 +128,22 @@ This guarantees all examples are valid, up-to-date, and remain functional as the
 | Group | Functions |
 |------:|-----------|
 | **Adapters** | [Lock](#lock) [Run](#run) [Unlock](#unlock) |
-| **Commands** | [Command](#command) |
+| **Calendar** | [Daily](#daily) [DailyAt](#dailyat) [DaysOfMonth](#daysofmonth) [LastDayOfMonth](#lastdayofmonth) [Monthly](#monthly) [MonthlyOn](#monthlyon) [Quarterly](#quarterly) [QuarterlyOn](#quarterlyon) [TwiceDaily](#twicedaily) [TwiceDailyAt](#twicedailyat) [TwiceMonthly](#twicemonthly) [Weekly](#weekly) [WeeklyOn](#weeklyon) [Yearly](#yearly) [YearlyOn](#yearlyon) |
+| **Commands** | [Command](#command) [Exec](#exec) |
 | **Concurrency** | [WithoutOverlapping](#withoutoverlapping) [WithoutOverlappingWithLocker](#withoutoverlappingwithlocker) |
 | **Configuration** | [Timezone](#timezone) [WithCommandRunner](#withcommandrunner) [WithNowFunc](#withnowfunc) |
-| **Construction** | [NewJobBuilder](#newjobbuilder) |
-| **Diagnostics** | [CronExpr](#cronexpr) [Error](#error) [Job](#job) [PrintJobsList](#printjobslist) |
+| **Construction** | [New](#new) [NewWithError](#newwitherror) |
+| **Diagnostics** | [CronExpr](#cronexpr) [Error](#error) [Job](#job) [Jobs](#jobs) [PrintJobsList](#printjobslist) |
 | **Execution** | [RunInBackground](#runinbackground) |
 | **Filters** | [Between](#between) [Days](#days) [Environments](#environments) [Fridays](#fridays) [Mondays](#mondays) [Saturdays](#saturdays) [Skip](#skip) [Sundays](#sundays) [Thursdays](#thursdays) [Tuesdays](#tuesdays) [UnlessBetween](#unlessbetween) [Wednesdays](#wednesdays) [Weekdays](#weekdays) [Weekends](#weekends) [When](#when) |
 | **Hooks** | [After](#after) [Before](#before) [OnFailure](#onfailure) [OnSuccess](#onsuccess) |
+| **Interop** | [GocronScheduler](#gocronscheduler) |
+| **Intervals** | [Every](#every) [EveryDuration](#everyduration) [EveryFifteenMinutes](#everyfifteenminutes) [EveryFifteenSeconds](#everyfifteenseconds) [EveryFiveMinutes](#everyfiveminutes) [EveryFiveSeconds](#everyfiveseconds) [EveryFourHours](#everyfourhours) [EveryFourMinutes](#everyfourminutes) [EveryMinute](#everyminute) [EveryOddHour](#everyoddhour) [EverySecond](#everysecond) [EverySixHours](#everysixhours) [EveryTenMinutes](#everytenminutes) [EveryTenSeconds](#everytenseconds) [EveryThirtyMinutes](#everythirtyminutes) [EveryThirtySeconds](#everythirtyseconds) [EveryThreeHours](#everythreehours) [EveryThreeMinutes](#everythreeminutes) [EveryTwentySeconds](#everytwentyseconds) [EveryTwoHours](#everytwohours) [EveryTwoMinutes](#everytwominutes) [EveryTwoSeconds](#everytwoseconds) [Hourly](#hourly) [HourlyAt](#hourlyat) [Hours](#hours) [Minutes](#minutes) [Seconds](#seconds) |
+| **Lifecycle** | [Shutdown](#shutdown) [Start](#start) [Stop](#stop) |
 | **Locking** | [NewCacheLocker](#newcachelocker) [NewRedisLocker](#newredislocker) |
 | **Metadata** | [JobMetadata](#jobmetadata) [Name](#name) |
-| **Scheduling** | [Cron](#cron) [Daily](#daily) [DailyAt](#dailyat) [DaysOfMonth](#daysofmonth) [Do](#do) [Every](#every) [EveryFifteenMinutes](#everyfifteenminutes) [EveryFifteenSeconds](#everyfifteenseconds) [EveryFiveMinutes](#everyfiveminutes) [EveryFiveSeconds](#everyfiveseconds) [EveryFourHours](#everyfourhours) [EveryFourMinutes](#everyfourminutes) [EveryMinute](#everyminute) [EveryOddHour](#everyoddhour) [EverySecond](#everysecond) [EverySixHours](#everysixhours) [EveryTenMinutes](#everytenminutes) [EveryTenSeconds](#everytenseconds) [EveryThirtyMinutes](#everythirtyminutes) [EveryThirtySeconds](#everythirtyseconds) [EveryThreeHours](#everythreehours) [EveryThreeMinutes](#everythreeminutes) [EveryTwentySeconds](#everytwentyseconds) [EveryTwoHours](#everytwohours) [EveryTwoMinutes](#everytwominutes) [EveryTwoSeconds](#everytwoseconds) [Hourly](#hourly) [HourlyAt](#hourlyat) [Hours](#hours) [LastDayOfMonth](#lastdayofmonth) [Minutes](#minutes) [Monthly](#monthly) [MonthlyOn](#monthlyon) [Quarterly](#quarterly) [QuarterlyOn](#quarterlyon) [Seconds](#seconds) [TwiceDaily](#twicedaily) [TwiceDailyAt](#twicedailyat) [TwiceMonthly](#twicemonthly) [Weekly](#weekly) [WeeklyOn](#weeklyon) [Yearly](#yearly) [YearlyOn](#yearlyon) |
 | **State management** | [RetainState](#retainstate) |
+| **Triggers** | [Cron](#cron) [Do](#do) |
 
 
 ## Adapters
@@ -146,20 +174,151 @@ _ = runner.Run(context.Background(), "echo", []string{"hi"})
 
 Unlock invokes the underlying function.
 
+```go
+lock := scheduler.LockFunc(func(context.Context) error { return nil })
+_ = lock.Unlock(context.Background())
+```
+
+## Calendar
+
+### <a id="daily"></a>Daily
+
+Daily schedules the job to run once per day at midnight.
+
+```go
+scheduler.New().Daily()
+```
+
+### <a id="dailyat"></a>DailyAt
+
+DailyAt schedules the job to run daily at a specific time (e.g., "13:00").
+
+```go
+scheduler.New().DailyAt("12:30")
+```
+
+### <a id="daysofmonth"></a>DaysOfMonth
+
+DaysOfMonth schedules the job to run on specific days of the month at a given time.
+
+```go
+scheduler.New().DaysOfMonth([]int{5, 20}, "07:15")
+```
+
+### <a id="lastdayofmonth"></a>LastDayOfMonth
+
+LastDayOfMonth schedules the job to run on the last day of each month at a specific time.
+
+```go
+scheduler.New().LastDayOfMonth("23:30")
+```
+
+### <a id="monthly"></a>Monthly
+
+Monthly schedules the job to run on the first day of each month at midnight.
+
+```go
+scheduler.New().Monthly()
+```
+
+### <a id="monthlyon"></a>MonthlyOn
+
+MonthlyOn schedules the job to run on a specific day of the month at a given time.
+
+```go
+scheduler.New().MonthlyOn(15, "09:30")
+```
+
+### <a id="quarterly"></a>Quarterly
+
+Quarterly schedules the job to run on the first day of each quarter at midnight.
+
+```go
+scheduler.New().Quarterly()
+```
+
+### <a id="quarterlyon"></a>QuarterlyOn
+
+QuarterlyOn schedules the job to run on a specific day of each quarter at a given time.
+
+```go
+scheduler.New().QuarterlyOn(3, "12:00")
+```
+
+### <a id="twicedaily"></a>TwiceDaily
+
+TwiceDaily schedules the job to run daily at two specified hours (e.g., 1 and 13).
+
+```go
+scheduler.New().TwiceDaily(1, 13)
+```
+
+### <a id="twicedailyat"></a>TwiceDailyAt
+
+TwiceDailyAt schedules the job to run daily at two specified times (e.g., 1:15 and 13:15).
+
+```go
+scheduler.New().TwiceDailyAt(1, 13, 15)
+```
+
+### <a id="twicemonthly"></a>TwiceMonthly
+
+TwiceMonthly schedules the job to run on two specific days of the month at the given time.
+
+```go
+scheduler.New().TwiceMonthly(1, 15, "10:00")
+```
+
+### <a id="weekly"></a>Weekly
+
+Weekly schedules the job to run once per week on Sunday at midnight.
+
+```go
+scheduler.New().Weekly()
+```
+
+### <a id="weeklyon"></a>WeeklyOn
+
+WeeklyOn schedules the job to run weekly on a specific day of the week and time.
+Day uses 0 = Sunday through 6 = Saturday.
+
+```go
+scheduler.New().WeeklyOn(1, "8:00")
+```
+
+### <a id="yearly"></a>Yearly
+
+Yearly schedules the job to run on January 1st every year at midnight.
+
+```go
+scheduler.New().Yearly()
+```
+
+### <a id="yearlyon"></a>YearlyOn
+
+YearlyOn schedules the job to run every year on a specific month, day, and time.
+
+```go
+scheduler.New().YearlyOn(12, 25, "06:45")
+```
+
 ## Commands
 
 ### <a id="command"></a>Command
 
 Command executes the current binary with the given subcommand and variadic args.
+It does not run arbitrary system executables; use Exec for that.
 
 ```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
+scheduler.New().Cron("0 0 * * *").Command("jobs:purge", "--force")
+```
 
-scheduler.NewJobBuilder(s).
-	Cron("0 0 * * *").
-	Command("jobs:purge", "--force")
+### <a id="exec"></a>Exec
+
+Exec runs an external executable with variadic args.
+
+```go
+scheduler.New().Cron("0 0 * * *").Exec("/usr/bin/env", "echo", "hello")
 ```
 
 ## Concurrency
@@ -169,11 +328,7 @@ scheduler.NewJobBuilder(s).
 WithoutOverlapping ensures the job does not run concurrently.
 
 ```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).
+scheduler.New().
 	WithoutOverlapping().
 	EveryFiveSeconds().
 	Do(func() { time.Sleep(7 * time.Second) })
@@ -188,11 +343,8 @@ locker := scheduler.LockerFunc(func(ctx context.Context, key string) (gocron.Loc
 	return scheduler.LockFunc(func(context.Context) error { return nil }), nil
 })
 
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
 
-scheduler.NewJobBuilder(s).
+scheduler.New().
 	WithoutOverlappingWithLocker(locker).
 	EveryMinute().
 	Do(func() {})
@@ -205,9 +357,7 @@ scheduler.NewJobBuilder(s).
 Timezone sets a timezone string for the job (not currently applied to gocron Scheduler).
 
 ```go
-scheduler.NewJobBuilder(nil).
-	Timezone("America/New_York").
-	Daily()
+scheduler.New().Timezone("America/New_York").Daily()
 ```
 
 ### <a id="withcommandrunner"></a>WithCommandRunner
@@ -216,13 +366,13 @@ WithCommandRunner overrides command execution (default: exec.CommandContext).
 
 ```go
 runner := scheduler.CommandRunnerFunc(func(_ context.Context, exe string, args []string) error {
-	fmt.Println(exe, args)
+	_ = exe
+	_ = args
 	return nil
 })
 
-builder := scheduler.NewJobBuilder(nil).
-	WithCommandRunner(runner)
-fmt.Printf("%T\n", builder)
+builder := scheduler.New().WithCommandRunner(runner)
+_ = builder
 ```
 
 ### <a id="withnowfunc"></a>WithNowFunc
@@ -231,20 +381,32 @@ WithNowFunc overrides current time (default: time.Now). Useful for tests.
 
 ```go
 fixed := func() time.Time { return time.Unix(0, 0) }
-scheduler.NewJobBuilder(nil).WithNowFunc(fixed)
+scheduler.New().WithNowFunc(fixed)
 ```
 
 ## Construction
 
-### <a id="newjobbuilder"></a>NewJobBuilder
+### <a id="new"></a>New
 
-NewJobBuilder creates a new JobBuilder with the provided scheduler.
+New creates and starts a scheduler facade.
+It panics only if gocron scheduler construction fails.
 
 ```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
+s := scheduler.New()
+defer s.Stop()
+s.Every(15).Seconds().Do(func() {})
+```
+
+### <a id="newwitherror"></a>NewWithError
+
+NewWithError creates and starts a scheduler facade and returns setup errors.
+
+```go
+s, err := scheduler.NewWithError()
+if err != nil {
+	panic(err)
+}
+defer s.Stop()
 ```
 
 ## Diagnostics
@@ -254,8 +416,9 @@ scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
 CronExpr returns the cron expression string configured for this job.
 
 ```go
-builder := scheduler.NewJobBuilder(nil).Cron("0 9 * * *")
+builder := scheduler.New().Cron("0 9 * * *")
 fmt.Println(builder.CronExpr())
+// Output: 0 9 * * *
 ```
 
 ### <a id="error"></a>Error
@@ -263,8 +426,9 @@ fmt.Println(builder.CronExpr())
 Error returns the error if any occurred during job scheduling.
 
 ```go
-builder := scheduler.NewJobBuilder(nil).DailyAt("bad")
+builder := scheduler.New().DailyAt("bad")
 fmt.Println(builder.Error())
+// Output: invalid DailyAt time format: invalid time format (expected HH:MM): "bad"
 ```
 
 ### <a id="job"></a>Job
@@ -272,29 +436,32 @@ fmt.Println(builder.Error())
 Job returns the last scheduled gocron.Job instance, if available.
 
 ```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-b := scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
+b := scheduler.New().EverySecond().Do(func() {})
 fmt.Println(b.Job() != nil)
+// Output: true
 ```
+
+### <a id="jobs"></a>Jobs
+
+Jobs returns scheduled jobs from the underlying scheduler.
 
 ### <a id="printjobslist"></a>PrintJobsList
 
 PrintJobsList renders and prints the scheduler job table to stdout.
 
 ```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).
-	EverySecond().
-	Name("heartbeat").
-	Do(func() {})
-
-scheduler.NewJobBuilder(s).PrintJobsList()
+s := scheduler.New()
+defer s.Stop()
+s.EverySecond().Name("heartbeat").Do(func() {})
+s.PrintJobsList()
+// Output:
+// +------------------------------------------------------------------------------------------+
+// | Scheduler Jobs › (1)
+// +-----------+----------+----------+-----------------------+--------------------+-----------+
+// | Name      | Type     | Schedule | Handler               | Next Run           | Tags      |
+// +-----------+----------+----------+-----------------------+--------------------+-----------+
+// | heartbeat | function | every 1s | main.main (anon func) | in 1s Mar 3 2:15AM | env=local |
+// +-----------+----------+----------+-----------------------+--------------------+-----------+
 ```
 
 ## Execution
@@ -304,9 +471,7 @@ scheduler.NewJobBuilder(s).PrintJobsList()
 RunInBackground runs command/exec tasks in a goroutine.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	RunInBackground().
-	Command("noop")
+scheduler.New().RunInBackground().Command("noop")
 ```
 
 ## Filters
@@ -316,9 +481,7 @@ scheduler.NewJobBuilder(nil).
 Between limits the job to run between the provided HH:MM times (inclusive).
 
 ```go
-scheduler.NewJobBuilder(nil).
-	Between("09:00", "17:00").
-	EveryMinute()
+scheduler.New().Between("09:00", "17:00").EveryMinute()
 ```
 
 ### <a id="days"></a>Days
@@ -326,9 +489,7 @@ scheduler.NewJobBuilder(nil).
 Days limits the job to a specific set of weekdays.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	Days(time.Monday, time.Wednesday, time.Friday).
-	DailyAt("07:00")
+scheduler.New().Days(time.Monday, time.Wednesday, time.Friday).DailyAt("07:00")
 ```
 
 ### <a id="environments"></a>Environments
@@ -336,7 +497,7 @@ scheduler.NewJobBuilder(nil).
 Environments restricts job registration to specific environment names (e.g. "production", "staging").
 
 ```go
-scheduler.NewJobBuilder(nil).Environments("production").Daily()
+scheduler.New().Environments("production").Daily()
 ```
 
 ### <a id="fridays"></a>Fridays
@@ -344,7 +505,7 @@ scheduler.NewJobBuilder(nil).Environments("production").Daily()
 Fridays limits the job to Fridays.
 
 ```go
-scheduler.NewJobBuilder(nil).Fridays().DailyAt("09:00")
+scheduler.New().Fridays().DailyAt("09:00")
 ```
 
 ### <a id="mondays"></a>Mondays
@@ -352,7 +513,7 @@ scheduler.NewJobBuilder(nil).Fridays().DailyAt("09:00")
 Mondays limits the job to Mondays.
 
 ```go
-scheduler.NewJobBuilder(nil).Mondays().DailyAt("09:00")
+scheduler.New().Mondays().DailyAt("09:00")
 ```
 
 ### <a id="saturdays"></a>Saturdays
@@ -360,7 +521,7 @@ scheduler.NewJobBuilder(nil).Mondays().DailyAt("09:00")
 Saturdays limits the job to Saturdays.
 
 ```go
-scheduler.NewJobBuilder(nil).Saturdays().DailyAt("09:00")
+scheduler.New().Saturdays().DailyAt("09:00")
 ```
 
 ### <a id="skip"></a>Skip
@@ -369,9 +530,7 @@ Skip prevents scheduling the job if the provided condition returns true.
 
 ```go
 enabled := false
-scheduler.NewJobBuilder(nil).
-	Skip(func() bool { return !enabled }).
-	Daily()
+scheduler.New().Skip(func() bool { return !enabled }).Daily()
 ```
 
 ### <a id="sundays"></a>Sundays
@@ -379,7 +538,7 @@ scheduler.NewJobBuilder(nil).
 Sundays limits the job to Sundays.
 
 ```go
-scheduler.NewJobBuilder(nil).Sundays().DailyAt("09:00")
+scheduler.New().Sundays().DailyAt("09:00")
 ```
 
 ### <a id="thursdays"></a>Thursdays
@@ -387,7 +546,7 @@ scheduler.NewJobBuilder(nil).Sundays().DailyAt("09:00")
 Thursdays limits the job to Thursdays.
 
 ```go
-scheduler.NewJobBuilder(nil).Thursdays().DailyAt("09:00")
+scheduler.New().Thursdays().DailyAt("09:00")
 ```
 
 ### <a id="tuesdays"></a>Tuesdays
@@ -395,7 +554,7 @@ scheduler.NewJobBuilder(nil).Thursdays().DailyAt("09:00")
 Tuesdays limits the job to Tuesdays.
 
 ```go
-scheduler.NewJobBuilder(nil).Tuesdays().DailyAt("09:00")
+scheduler.New().Tuesdays().DailyAt("09:00")
 ```
 
 ### <a id="unlessbetween"></a>UnlessBetween
@@ -403,9 +562,7 @@ scheduler.NewJobBuilder(nil).Tuesdays().DailyAt("09:00")
 UnlessBetween prevents the job from running between the provided HH:MM times.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	UnlessBetween("22:00", "06:00").
-	EveryMinute()
+scheduler.New().UnlessBetween("22:00", "06:00").EveryMinute()
 ```
 
 ### <a id="wednesdays"></a>Wednesdays
@@ -413,7 +570,7 @@ scheduler.NewJobBuilder(nil).
 Wednesdays limits the job to Wednesdays.
 
 ```go
-scheduler.NewJobBuilder(nil).Wednesdays().DailyAt("09:00")
+scheduler.New().Wednesdays().DailyAt("09:00")
 ```
 
 ### <a id="weekdays"></a>Weekdays
@@ -421,7 +578,7 @@ scheduler.NewJobBuilder(nil).Wednesdays().DailyAt("09:00")
 Weekdays limits the job to run only on weekdays (Mon-Fri).
 
 ```go
-scheduler.NewJobBuilder(nil).Weekdays().DailyAt("09:00")
+scheduler.New().Weekdays().DailyAt("09:00")
 ```
 
 ### <a id="weekends"></a>Weekends
@@ -429,7 +586,7 @@ scheduler.NewJobBuilder(nil).Weekdays().DailyAt("09:00")
 Weekends limits the job to run only on weekends (Sat-Sun).
 
 ```go
-scheduler.NewJobBuilder(nil).Weekends().DailyAt("10:00")
+scheduler.New().Weekends().DailyAt("10:00")
 ```
 
 ### <a id="when"></a>When
@@ -438,9 +595,7 @@ When only schedules the job if the provided condition returns true.
 
 ```go
 flag := true
-scheduler.NewJobBuilder(nil).
-	When(func() bool { return flag }).
-	Daily()
+scheduler.New().When(func() bool { return flag }).Daily()
 ```
 
 ## Hooks
@@ -450,9 +605,7 @@ scheduler.NewJobBuilder(nil).
 After sets a hook to run after task execution.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	After(func() { println("after") }).
-	Daily()
+scheduler.New().After(func() {}).Daily()
 ```
 
 ### <a id="before"></a>Before
@@ -460,9 +613,7 @@ scheduler.NewJobBuilder(nil).
 Before sets a hook to run before task execution.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	Before(func() { println("before") }).
-	Daily()
+scheduler.New().Before(func() {}).Daily()
 ```
 
 ### <a id="onfailure"></a>OnFailure
@@ -470,9 +621,7 @@ scheduler.NewJobBuilder(nil).
 OnFailure sets a hook to run after failed task execution.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	OnFailure(func() { println("failure") }).
-	Daily()
+scheduler.New().OnFailure(func() {}).Daily()
 ```
 
 ### <a id="onsuccess"></a>OnSuccess
@@ -480,9 +629,257 @@ scheduler.NewJobBuilder(nil).
 OnSuccess sets a hook to run after successful task execution.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	OnSuccess(func() { println("success") }).
-	Daily()
+scheduler.New().OnSuccess(func() {}).Daily()
+```
+
+## Interop
+
+### <a id="gocronscheduler"></a>GocronScheduler
+
+GocronScheduler returns the underlying gocron scheduler for advanced integration.
+Prefer the fluent scheduler API for typical use-cases.
+
+## Intervals
+
+### <a id="every"></a>Every
+
+Every schedules a job to run every X seconds, minutes, or hours.
+
+```go
+scheduler.New().Every(10).Minutes()
+```
+
+### <a id="everyduration"></a>EveryDuration
+
+EveryDuration schedules a duration-based interval job builder.
+
+### <a id="everyfifteenminutes"></a>EveryFifteenMinutes
+
+EveryFifteenMinutes schedules the job to run every 15 minutes.
+
+```go
+scheduler.New().EveryFifteenMinutes().Do(func() {})
+```
+
+### <a id="everyfifteenseconds"></a>EveryFifteenSeconds
+
+EveryFifteenSeconds schedules the job to run every 15 seconds.
+
+```go
+scheduler.New().EveryFifteenSeconds().Do(func() {})
+```
+
+### <a id="everyfiveminutes"></a>EveryFiveMinutes
+
+EveryFiveMinutes schedules the job to run every 5 minutes.
+
+```go
+scheduler.New().EveryFiveMinutes().Do(func() {})
+```
+
+### <a id="everyfiveseconds"></a>EveryFiveSeconds
+
+EveryFiveSeconds schedules the job to run every 5 seconds.
+
+```go
+scheduler.New().EveryFiveSeconds().Do(func() {})
+```
+
+### <a id="everyfourhours"></a>EveryFourHours
+
+EveryFourHours schedules the job to run every four hours at the specified minute.
+
+```go
+scheduler.New().EveryFourHours(25)
+```
+
+### <a id="everyfourminutes"></a>EveryFourMinutes
+
+EveryFourMinutes schedules the job to run every 4 minutes.
+
+```go
+scheduler.New().EveryFourMinutes().Do(func() {})
+```
+
+### <a id="everyminute"></a>EveryMinute
+
+EveryMinute schedules the job to run every 1 minute.
+
+```go
+scheduler.New().EveryMinute().Do(func() {})
+```
+
+### <a id="everyoddhour"></a>EveryOddHour
+
+EveryOddHour schedules the job to run every odd-numbered hour at the specified minute.
+
+```go
+scheduler.New().EveryOddHour(10)
+```
+
+### <a id="everysecond"></a>EverySecond
+
+EverySecond schedules the job to run every 1 second.
+
+```go
+scheduler.New().EverySecond().Do(func() {})
+```
+
+### <a id="everysixhours"></a>EverySixHours
+
+EverySixHours schedules the job to run every six hours at the specified minute.
+
+```go
+scheduler.New().EverySixHours(30)
+```
+
+### <a id="everytenminutes"></a>EveryTenMinutes
+
+EveryTenMinutes schedules the job to run every 10 minutes.
+
+```go
+scheduler.New().EveryTenMinutes().Do(func() {})
+```
+
+### <a id="everytenseconds"></a>EveryTenSeconds
+
+EveryTenSeconds schedules the job to run every 10 seconds.
+
+```go
+scheduler.New().EveryTenSeconds().Do(func() {})
+```
+
+### <a id="everythirtyminutes"></a>EveryThirtyMinutes
+
+EveryThirtyMinutes schedules the job to run every 30 minutes.
+
+```go
+scheduler.New().EveryThirtyMinutes().Do(func() {})
+```
+
+### <a id="everythirtyseconds"></a>EveryThirtySeconds
+
+EveryThirtySeconds schedules the job to run every 30 seconds.
+
+```go
+scheduler.New().EveryThirtySeconds().Do(func() {})
+```
+
+### <a id="everythreehours"></a>EveryThreeHours
+
+EveryThreeHours schedules the job to run every three hours at the specified minute.
+
+```go
+scheduler.New().EveryThreeHours(20)
+```
+
+### <a id="everythreeminutes"></a>EveryThreeMinutes
+
+EveryThreeMinutes schedules the job to run every 3 minutes.
+
+```go
+scheduler.New().EveryThreeMinutes().Do(func() {})
+```
+
+### <a id="everytwentyseconds"></a>EveryTwentySeconds
+
+EveryTwentySeconds schedules the job to run every 20 seconds.
+
+```go
+scheduler.New().EveryTwentySeconds().Do(func() {})
+```
+
+### <a id="everytwohours"></a>EveryTwoHours
+
+EveryTwoHours schedules the job to run every two hours at the specified minute.
+
+```go
+scheduler.New().EveryTwoHours(15)
+```
+
+### <a id="everytwominutes"></a>EveryTwoMinutes
+
+EveryTwoMinutes schedules the job to run every 2 minutes.
+
+```go
+scheduler.New().EveryTwoMinutes().Do(func() {})
+```
+
+### <a id="everytwoseconds"></a>EveryTwoSeconds
+
+EveryTwoSeconds schedules the job to run every 2 seconds.
+
+```go
+scheduler.New().EveryTwoSeconds().Do(func() {})
+```
+
+### <a id="hourly"></a>Hourly
+
+Hourly schedules the job to run every hour.
+
+```go
+scheduler.New().Hourly().Do(func() {})
+```
+
+### <a id="hourlyat"></a>HourlyAt
+
+HourlyAt schedules the job to run every hour at the specified minute.
+
+```go
+scheduler.New().HourlyAt(5)
+```
+
+### <a id="hours"></a>Hours
+
+Hours schedules the job to run every X hours.
+
+```go
+scheduler.New().Every(6).Hours()
+```
+
+### <a id="minutes"></a>Minutes
+
+Minutes schedules the job to run every X minutes.
+
+```go
+scheduler.New().Every(15).Minutes()
+```
+
+### <a id="seconds"></a>Seconds
+
+Seconds schedules the job to run every X seconds.
+
+```go
+scheduler.New().Every(3).Seconds().Do(func() {})
+```
+
+## Lifecycle
+
+### <a id="shutdown"></a>Shutdown
+
+Shutdown gracefully shuts down the underlying scheduler.
+
+```go
+s := scheduler.New()
+_ = s.Shutdown()
+```
+
+### <a id="start"></a>Start
+
+Start starts the underlying scheduler.
+
+```go
+s := scheduler.New()
+s.Start()
+```
+
+### <a id="stop"></a>Stop
+
+Stop gracefully shuts down the scheduler.
+
+```go
+s := scheduler.New()
+_ = s.Stop()
 ```
 
 ## Locking
@@ -533,11 +930,7 @@ _, _ = locker.Lock(context.Background(), "job")
 JobMetadata returns a copy of the tracked job metadata keyed by job ID.
 
 ```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-b := scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
+b := scheduler.New().EverySecond().Do(func() {})
 for id, meta := range b.JobMetadata() {
 	_ = id
 	_ = meta.Name
@@ -549,437 +942,7 @@ for id, meta := range b.JobMetadata() {
 Name sets an explicit job name.
 
 ```go
-scheduler.NewJobBuilder(nil).
-	Name("cache:refresh").
-	HourlyAt(15)
-```
-
-## Scheduling
-
-### <a id="cron"></a>Cron
-
-Cron sets the cron expression for the job.
-
-```go
-builder := scheduler.NewJobBuilder(nil).Cron("15 3 * * *")
-fmt.Println(builder.CronExpr())
-```
-
-### <a id="daily"></a>Daily
-
-Daily schedules the job to run once per day at midnight.
-
-```go
-scheduler.NewJobBuilder(nil).Daily()
-```
-
-### <a id="dailyat"></a>DailyAt
-
-DailyAt schedules the job to run daily at a specific time (e.g., "13:00").
-
-```go
-scheduler.NewJobBuilder(nil).DailyAt("12:30")
-```
-
-### <a id="daysofmonth"></a>DaysOfMonth
-
-DaysOfMonth schedules the job to run on specific days of the month at a given time.
-
-```go
-scheduler.NewJobBuilder(nil).DaysOfMonth([]int{5, 20}, "07:15")
-```
-
-### <a id="do"></a>Do
-
-Do schedules the job with the provided task function.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).
-Name("cleanup").
-Cron("0 0 * * *").
-Do(func() {})
-```
-
-### <a id="every"></a>Every
-
-Every schedules a job to run every X seconds, minutes, or hours.
-
-```go
-scheduler.NewJobBuilder(nil).
-	Every(10).
-	Minutes()
-```
-
-### <a id="everyfifteenminutes"></a>EveryFifteenMinutes
-
-EveryFifteenMinutes schedules the job to run every 15 minutes.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryFifteenMinutes().Do(func() {})
-```
-
-### <a id="everyfifteenseconds"></a>EveryFifteenSeconds
-
-EveryFifteenSeconds schedules the job to run every 15 seconds.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryFifteenSeconds().Do(func() {})
-```
-
-### <a id="everyfiveminutes"></a>EveryFiveMinutes
-
-EveryFiveMinutes schedules the job to run every 5 minutes.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryFiveMinutes().Do(func() {})
-```
-
-### <a id="everyfiveseconds"></a>EveryFiveSeconds
-
-EveryFiveSeconds schedules the job to run every 5 seconds.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryFiveSeconds().Do(func() {})
-```
-
-### <a id="everyfourhours"></a>EveryFourHours
-
-EveryFourHours schedules the job to run every four hours at the specified minute.
-
-```go
-scheduler.NewJobBuilder(nil).EveryFourHours(25)
-```
-
-### <a id="everyfourminutes"></a>EveryFourMinutes
-
-EveryFourMinutes schedules the job to run every 4 minutes.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryFourMinutes().Do(func() {})
-```
-
-### <a id="everyminute"></a>EveryMinute
-
-EveryMinute schedules the job to run every 1 minute.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryMinute().Do(func() {})
-```
-
-### <a id="everyoddhour"></a>EveryOddHour
-
-EveryOddHour schedules the job to run every odd-numbered hour at the specified minute.
-
-```go
-scheduler.NewJobBuilder(nil).EveryOddHour(10)
-```
-
-### <a id="everysecond"></a>EverySecond
-
-EverySecond schedules the job to run every 1 second.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
-```
-
-### <a id="everysixhours"></a>EverySixHours
-
-EverySixHours schedules the job to run every six hours at the specified minute.
-
-```go
-scheduler.NewJobBuilder(nil).EverySixHours(30)
-```
-
-### <a id="everytenminutes"></a>EveryTenMinutes
-
-EveryTenMinutes schedules the job to run every 10 minutes.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryTenMinutes().Do(func() {})
-```
-
-### <a id="everytenseconds"></a>EveryTenSeconds
-
-EveryTenSeconds schedules the job to run every 10 seconds.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryTenSeconds().Do(func() {})
-```
-
-### <a id="everythirtyminutes"></a>EveryThirtyMinutes
-
-EveryThirtyMinutes schedules the job to run every 30 minutes.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryThirtyMinutes().Do(func() {})
-```
-
-### <a id="everythirtyseconds"></a>EveryThirtySeconds
-
-EveryThirtySeconds schedules the job to run every 30 seconds.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryThirtySeconds().Do(func() {})
-```
-
-### <a id="everythreehours"></a>EveryThreeHours
-
-EveryThreeHours schedules the job to run every three hours at the specified minute.
-
-```go
-scheduler.NewJobBuilder(nil).EveryThreeHours(20)
-```
-
-### <a id="everythreeminutes"></a>EveryThreeMinutes
-
-EveryThreeMinutes schedules the job to run every 3 minutes.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryThreeMinutes().Do(func() {})
-```
-
-### <a id="everytwentyseconds"></a>EveryTwentySeconds
-
-EveryTwentySeconds schedules the job to run every 20 seconds.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryTwentySeconds().Do(func() {})
-```
-
-### <a id="everytwohours"></a>EveryTwoHours
-
-EveryTwoHours schedules the job to run every two hours at the specified minute.
-
-```go
-scheduler.NewJobBuilder(nil).EveryTwoHours(15)
-```
-
-### <a id="everytwominutes"></a>EveryTwoMinutes
-
-EveryTwoMinutes schedules the job to run every 2 minutes.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryTwoMinutes().Do(func() {})
-```
-
-### <a id="everytwoseconds"></a>EveryTwoSeconds
-
-EveryTwoSeconds schedules the job to run every 2 seconds.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).EveryTwoSeconds().Do(func() {})
-```
-
-### <a id="hourly"></a>Hourly
-
-Hourly schedules the job to run every hour.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).Hourly().Do(func() {})
-```
-
-### <a id="hourlyat"></a>HourlyAt
-
-HourlyAt schedules the job to run every hour at the specified minute.
-
-```go
-scheduler.NewJobBuilder(nil).HourlyAt(5)
-```
-
-### <a id="hours"></a>Hours
-
-Hours schedules the job to run every X hours.
-
-```go
-scheduler.NewJobBuilder(nil).Every(6).Hours()
-```
-
-### <a id="lastdayofmonth"></a>LastDayOfMonth
-
-LastDayOfMonth schedules the job to run on the last day of each month at a specific time.
-
-```go
-scheduler.NewJobBuilder(nil).LastDayOfMonth("23:30")
-```
-
-### <a id="minutes"></a>Minutes
-
-Minutes schedules the job to run every X minutes.
-
-```go
-scheduler.NewJobBuilder(nil).Every(15).Minutes()
-```
-
-### <a id="monthly"></a>Monthly
-
-Monthly schedules the job to run on the first day of each month at midnight.
-
-```go
-scheduler.NewJobBuilder(nil).Monthly()
-```
-
-### <a id="monthlyon"></a>MonthlyOn
-
-MonthlyOn schedules the job to run on a specific day of the month at a given time.
-
-```go
-scheduler.NewJobBuilder(nil).MonthlyOn(15, "09:30")
-```
-
-### <a id="quarterly"></a>Quarterly
-
-Quarterly schedules the job to run on the first day of each quarter at midnight.
-
-```go
-scheduler.NewJobBuilder(nil).Quarterly()
-```
-
-### <a id="quarterlyon"></a>QuarterlyOn
-
-QuarterlyOn schedules the job to run on a specific day of each quarter at a given time.
-
-```go
-scheduler.NewJobBuilder(nil).QuarterlyOn(3, "12:00")
-```
-
-### <a id="seconds"></a>Seconds
-
-Seconds schedules the job to run every X seconds.
-
-```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
-
-scheduler.NewJobBuilder(s).
-	Every(3).
-	Seconds().
-	Do(func() {})
-```
-
-### <a id="twicedaily"></a>TwiceDaily
-
-TwiceDaily schedules the job to run daily at two specified hours (e.g., 1 and 13).
-
-```go
-scheduler.NewJobBuilder(nil).TwiceDaily(1, 13)
-```
-
-### <a id="twicedailyat"></a>TwiceDailyAt
-
-TwiceDailyAt schedules the job to run daily at two specified times (e.g., 1:15 and 13:15).
-
-```go
-scheduler.NewJobBuilder(nil).TwiceDailyAt(1, 13, 15)
-```
-
-### <a id="twicemonthly"></a>TwiceMonthly
-
-TwiceMonthly schedules the job to run on two specific days of the month at the given time.
-
-```go
-scheduler.NewJobBuilder(nil).TwiceMonthly(1, 15, "10:00")
-```
-
-### <a id="weekly"></a>Weekly
-
-Weekly schedules the job to run once per week on Sunday at midnight.
-
-```go
-scheduler.NewJobBuilder(nil).Weekly()
-```
-
-### <a id="weeklyon"></a>WeeklyOn
-
-WeeklyOn schedules the job to run weekly on a specific day of the week and time.
-Day uses 0 = Sunday through 6 = Saturday.
-
-```go
-scheduler.NewJobBuilder(nil).WeeklyOn(1, "8:00")
-```
-
-### <a id="yearly"></a>Yearly
-
-Yearly schedules the job to run on January 1st every year at midnight.
-
-```go
-scheduler.NewJobBuilder(nil).Yearly()
-```
-
-### <a id="yearlyon"></a>YearlyOn
-
-YearlyOn schedules the job to run every year on a specific month, day, and time.
-
-```go
-scheduler.NewJobBuilder(nil).YearlyOn(12, 25, "06:45")
+scheduler.New().Name("cache:refresh").HourlyAt(15)
 ```
 
 ## State management
@@ -989,12 +952,28 @@ scheduler.NewJobBuilder(nil).YearlyOn(12, 25, "06:45")
 RetainState allows the job to retain its state after execution.
 
 ```go
-s, _ := gocron.NewScheduler()
-s.Start()
-defer s.Shutdown()
+builder := scheduler.New().EverySecond().RetainState()
+builder.Do(func() {})
+builder.Do(func() {})
+```
 
-builder := scheduler.NewJobBuilder(s).EverySecond().RetainState()
-builder.Do(func() {})
-builder.Do(func() {})
+## Triggers
+
+### <a id="cron"></a>Cron
+
+Cron sets the cron expression for the job.
+
+```go
+builder := scheduler.New().Cron("15 3 * * *")
+fmt.Println(builder.CronExpr())
+// Output: 15 3 * * *
+```
+
+### <a id="do"></a>Do
+
+Do schedules the job with the provided task function.
+
+```go
+scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func() {})
 ```
 <!-- api:embed:end -->
