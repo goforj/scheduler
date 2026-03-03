@@ -1,4 +1,4 @@
-package scheduler
+package examples
 
 import (
 	"bytes"
@@ -10,7 +10,7 @@ import (
 )
 
 func TestExamplesBuild(t *testing.T) {
-	examplesDir := "examples"
+	examplesDir := "."
 
 	entries, err := os.ReadDir(examplesDir)
 	if err != nil {
@@ -19,6 +19,9 @@ func TestExamplesBuild(t *testing.T) {
 
 	for _, e := range entries {
 		if !e.IsDir() {
+			continue
+		}
+		if e.Name() == ".git" {
 			continue
 		}
 
