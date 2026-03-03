@@ -6,7 +6,5 @@ func main() {
 	// RunInBackground runs command/exec tasks in a goroutine.
 
 	// Example: allow command jobs to run async
-	scheduler.NewJobBuilder(nil).
-		RunInBackground().
-		Command("noop")
+	scheduler.New().RunInBackground().Command("noop")
 }

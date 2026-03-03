@@ -6,5 +6,5 @@ func main() {
 	// Daily schedules the job to run once per day at midnight.
 
 	// Example: nightly task
-	scheduler.NewJobBuilder(nil).Daily()
+	scheduler.New().Daily()
 }

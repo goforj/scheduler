@@ -6,5 +6,5 @@ func main() {
 	// Minutes schedules the job to run every X minutes.
 
 	// Example: chain a minute-based interval
-	scheduler.NewJobBuilder(nil).Every(15).Minutes()
+	scheduler.New().Every(15).Minutes()
 }

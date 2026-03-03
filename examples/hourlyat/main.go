@@ -6,5 +6,5 @@ func main() {
 	// HourlyAt schedules the job to run every hour at the specified minute.
 
 	// Example: run at the 5th minute of each hour
-	scheduler.NewJobBuilder(nil).HourlyAt(5)
+	scheduler.New().HourlyAt(5)
 }

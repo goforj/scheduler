@@ -6,7 +6,5 @@ func main() {
 	// OnSuccess sets a hook to run after successful task execution.
 
 	// Example: record success
-	scheduler.NewJobBuilder(nil).
-		OnSuccess(func() { println("success") }).
-		Daily()
+	scheduler.New().OnSuccess(func() {}).Daily()
 }

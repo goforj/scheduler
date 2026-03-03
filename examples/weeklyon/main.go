@@ -7,5 +7,5 @@ func main() {
 	// Day uses 0 = Sunday through 6 = Saturday.
 
 	// Example: run each Monday at 08:00
-	scheduler.NewJobBuilder(nil).WeeklyOn(1, "8:00")
+	scheduler.New().WeeklyOn(1, "8:00")
 }

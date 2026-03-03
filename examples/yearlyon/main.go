@@ -6,5 +6,5 @@ func main() {
 	// YearlyOn schedules the job to run every year on a specific month, day, and time.
 
 	// Example: yearly on a specific date
-	scheduler.NewJobBuilder(nil).YearlyOn(12, 25, "06:45")
+	scheduler.New().YearlyOn(12, 25, "06:45")
 }

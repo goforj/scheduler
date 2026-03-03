@@ -6,5 +6,5 @@ func main() {
 	// Hours schedules the job to run every X hours.
 
 	// Example: build an hourly cadence
-	scheduler.NewJobBuilder(nil).Every(6).Hours()
+	scheduler.New().Every(6).Hours()
 }

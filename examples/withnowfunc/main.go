@@ -10,5 +10,5 @@ func main() {
 
 	// Example: freeze time for predicates
 	fixed := func() time.Time { return time.Unix(0, 0) }
-	scheduler.NewJobBuilder(nil).WithNowFunc(fixed)
+	scheduler.New().WithNowFunc(fixed)
 }

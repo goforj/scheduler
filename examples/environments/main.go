@@ -6,5 +6,5 @@ func main() {
 	// Environments restricts job registration to specific environment names (e.g. "production", "staging").
 
 	// Example: only register in production
-	scheduler.NewJobBuilder(nil).Environments("production").Daily()
+	scheduler.New().Environments("production").Daily()
 }

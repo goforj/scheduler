@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/goforj/scheduler"
 )
 
@@ -11,11 +10,11 @@ func main() {
 
 	// Example: swap in a custom runner
 	runner := scheduler.CommandRunnerFunc(func(_ context.Context, exe string, args []string) error {
-		fmt.Println(exe, args)
+		_ = exe
+		_ = args
 		return nil
 	})
 
-	builder := scheduler.NewJobBuilder(nil).
-		WithCommandRunner(runner)
-	fmt.Printf("%T\n", builder)
+	builder := scheduler.New().WithCommandRunner(runner)
+	_ = builder
 }

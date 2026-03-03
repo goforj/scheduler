@@ -14,11 +14,8 @@ func main() {
 		return scheduler.LockFunc(func(context.Context) error { return nil }), nil
 	})
 
-	s, _ := gocron.NewScheduler()
-	s.Start()
-	defer s.Shutdown()
 
-	scheduler.NewJobBuilder(s).
+	scheduler.New().
 		WithoutOverlappingWithLocker(locker).
 		EveryMinute().
 		Do(func() {})

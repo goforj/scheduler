@@ -7,7 +7,5 @@ func main() {
 
 	// Example: guard scheduling with a flag
 	flag := true
-	scheduler.NewJobBuilder(nil).
-		When(func() bool { return flag }).
-		Daily()
+	scheduler.New().When(func() bool { return flag }).Daily()
 }

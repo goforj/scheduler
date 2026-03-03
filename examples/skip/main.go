@@ -7,7 +7,5 @@ func main() {
 
 	// Example: suppress jobs based on a switch
 	enabled := false
-	scheduler.NewJobBuilder(nil).
-		Skip(func() bool { return !enabled }).
-		Daily()
+	scheduler.New().Skip(func() bool { return !enabled }).Daily()
 }

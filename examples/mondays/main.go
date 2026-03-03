@@ -6,5 +6,5 @@ func main() {
 	// Mondays limits the job to Mondays.
 
 	// Example: run only on Mondays
-	scheduler.NewJobBuilder(nil).Mondays().DailyAt("09:00")
+	scheduler.New().Mondays().DailyAt("09:00")
 }
