@@ -112,16 +112,18 @@ func (j *JobBuilder) getJobsList() []*jobEntry {
 //
 // Example: print current jobs
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).
-//		EverySecond().
-//		Name("heartbeat").
-//		Do(func() {})
-//
-//	scheduler.NewJobBuilder(s).PrintJobsList()
+//	s := scheduler.New()
+//	defer s.Stop()
+//	s.EverySecond().Name("heartbeat").Do(func() {})
+//	s.PrintJobsList()
+//	// Output:
+//	// +------------------------------------------------------------------------------------------+
+//	// | Scheduler Jobs › (1)
+//	// +-----------+----------+----------+-----------------------+--------------------+-----------+
+//	// | Name      | Type     | Schedule | Handler               | Next Run           | Tags      |
+//	// +-----------+----------+----------+-----------------------+--------------------+-----------+
+//	// | heartbeat | function | every 1s | main.main (anon func) | in 1s Mar 3 2:15AM | env=local |
+//	// +-----------+----------+----------+-----------------------+--------------------+-----------+
 func (j *JobBuilder) PrintJobsList() {
 	entries := j.getJobsList()
 	if len(entries) == 0 {
@@ -223,7 +225,7 @@ func renderTarget(target string, kind jobTargetKind, nameRaw string) string {
 	if target == "" || target == nameRaw {
 		return jobStyleMissingInfo.Render("-")
 	}
-	if kind == jobTargetCommand {
+	if kind == jobTargetCommand || kind == jobTargetExec {
 		return jobStyleTargetCmd.Render(target)
 	}
 	return jobStyleTargetFunc.Render(target)

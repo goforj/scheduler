@@ -52,7 +52,7 @@ func TestEverySecond_Do(t *testing.T) {
 	s := newTestScheduler(clock)
 	var called atomic.Bool
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		EverySecond().
 		Do(func() { called.Store(true) })
 
@@ -69,19 +69,19 @@ func TestWhenSkipAndEnvironments(t *testing.T) {
 
 	var called atomic.Bool
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		Environments("production").
 		EverySecond().
 		Do(func() { called.Store(true) })
-	require.Len(t, NewJobBuilder(s).JobMetadata(), 0)
+	require.Len(t, newJobBuilder(s).JobMetadata(), 0)
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		EverySecond().
 		When(func() bool { return false }).
 		Do(func() { called.Store(true) })
 	require.False(t, called.Load())
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		EverySecond().
 		Skip(func() bool { return true }).
 		Do(func() { called.Store(true) })
@@ -99,28 +99,28 @@ func TestScheduleBuilders_AllVariants(t *testing.T) {
 		wantDur *time.Duration
 		wantExp string
 	}{
-		{"EverySecond", func() *JobBuilder { return NewJobBuilder(nil).EverySecond() }, false, &oneSec, ""},
-		{"EveryTenSecondsFluent", func() *JobBuilder { return NewJobBuilder(nil).Every(10).Seconds() }, false, ptrDur(10 * time.Second), ""},
-		{"DailyAt", func() *JobBuilder { return NewJobBuilder(nil).DailyAt("13:00") }, false, nil, "0 13 * * *"},
-		{"DailyAtInvalid", func() *JobBuilder { return NewJobBuilder(nil).DailyAt("bad") }, true, nil, ""},
-		{"TwiceDailyAt", func() *JobBuilder { return NewJobBuilder(nil).TwiceDailyAt(1, 13, 15) }, false, nil, "15 1,13 * * *"},
-		{"WeeklyOn", func() *JobBuilder { return NewJobBuilder(nil).WeeklyOn(1, "8:00") }, false, nil, "0 8 * * 1"},
-		{"WeeklyOnInvalid", func() *JobBuilder { return NewJobBuilder(nil).WeeklyOn(1, "bad") }, true, nil, ""},
-		{"MonthlyOn", func() *JobBuilder { return NewJobBuilder(nil).MonthlyOn(5, "9:30") }, false, nil, "30 9 5 * *"},
-		{"MonthlyOnInvalid", func() *JobBuilder { return NewJobBuilder(nil).MonthlyOn(5, "x") }, true, nil, ""},
-		{"TwiceMonthly", func() *JobBuilder { return NewJobBuilder(nil).TwiceMonthly(1, 15, "10:00") }, false, nil, "0 10 1,15 * *"},
-		{"TwiceMonthlyInvalid", func() *JobBuilder { return NewJobBuilder(nil).TwiceMonthly(1, 15, "x") }, true, nil, ""},
-		{"LastDayOfMonth", func() *JobBuilder { return NewJobBuilder(nil).LastDayOfMonth("23:15") }, false, nil, "15 23 L * *"},
-		{"LastDayOfMonthInvalid", func() *JobBuilder { return NewJobBuilder(nil).LastDayOfMonth("x") }, true, nil, ""},
-		{"QuarterlyOn", func() *JobBuilder { return NewJobBuilder(nil).QuarterlyOn(3, "12:00") }, false, nil, "0 12 3 1,4,7,10 *"},
-		{"QuarterlyOnInvalid", func() *JobBuilder { return NewJobBuilder(nil).QuarterlyOn(3, "x") }, true, nil, ""},
-		{"YearlyOn", func() *JobBuilder { return NewJobBuilder(nil).YearlyOn(12, 25, "6:45") }, false, nil, "45 6 25 12 *"},
-		{"YearlyOnInvalid", func() *JobBuilder { return NewJobBuilder(nil).YearlyOn(12, 25, "x") }, true, nil, ""},
-		{"HourlyAt", func() *JobBuilder { return NewJobBuilder(nil).HourlyAt(5) }, false, nil, "5 * * * *"},
-		{"Daily", func() *JobBuilder { return NewJobBuilder(nil).Daily() }, false, nil, "0 0 * * *"},
-		{"Weekly", func() *JobBuilder { return NewJobBuilder(nil).Weekly() }, false, nil, "0 0 * * 0"},
-		{"Quarterly", func() *JobBuilder { return NewJobBuilder(nil).Quarterly() }, false, nil, "0 0 1 1,4,7,10 *"},
-		{"Yearly", func() *JobBuilder { return NewJobBuilder(nil).Yearly() }, false, nil, "0 0 1 1 *"},
+		{"EverySecond", func() *JobBuilder { return newJobBuilder(nil).EverySecond() }, false, &oneSec, ""},
+		{"EveryTenSecondsFluent", func() *JobBuilder { return newJobBuilder(nil).Every(10).Seconds() }, false, ptrDur(10 * time.Second), ""},
+		{"DailyAt", func() *JobBuilder { return newJobBuilder(nil).DailyAt("13:00") }, false, nil, "0 13 * * *"},
+		{"DailyAtInvalid", func() *JobBuilder { return newJobBuilder(nil).DailyAt("bad") }, true, nil, ""},
+		{"TwiceDailyAt", func() *JobBuilder { return newJobBuilder(nil).TwiceDailyAt(1, 13, 15) }, false, nil, "15 1,13 * * *"},
+		{"WeeklyOn", func() *JobBuilder { return newJobBuilder(nil).WeeklyOn(1, "8:00") }, false, nil, "0 8 * * 1"},
+		{"WeeklyOnInvalid", func() *JobBuilder { return newJobBuilder(nil).WeeklyOn(1, "bad") }, true, nil, ""},
+		{"MonthlyOn", func() *JobBuilder { return newJobBuilder(nil).MonthlyOn(5, "9:30") }, false, nil, "30 9 5 * *"},
+		{"MonthlyOnInvalid", func() *JobBuilder { return newJobBuilder(nil).MonthlyOn(5, "x") }, true, nil, ""},
+		{"TwiceMonthly", func() *JobBuilder { return newJobBuilder(nil).TwiceMonthly(1, 15, "10:00") }, false, nil, "0 10 1,15 * *"},
+		{"TwiceMonthlyInvalid", func() *JobBuilder { return newJobBuilder(nil).TwiceMonthly(1, 15, "x") }, true, nil, ""},
+		{"LastDayOfMonth", func() *JobBuilder { return newJobBuilder(nil).LastDayOfMonth("23:15") }, false, nil, "15 23 L * *"},
+		{"LastDayOfMonthInvalid", func() *JobBuilder { return newJobBuilder(nil).LastDayOfMonth("x") }, true, nil, ""},
+		{"QuarterlyOn", func() *JobBuilder { return newJobBuilder(nil).QuarterlyOn(3, "12:00") }, false, nil, "0 12 3 1,4,7,10 *"},
+		{"QuarterlyOnInvalid", func() *JobBuilder { return newJobBuilder(nil).QuarterlyOn(3, "x") }, true, nil, ""},
+		{"YearlyOn", func() *JobBuilder { return newJobBuilder(nil).YearlyOn(12, 25, "6:45") }, false, nil, "45 6 25 12 *"},
+		{"YearlyOnInvalid", func() *JobBuilder { return newJobBuilder(nil).YearlyOn(12, 25, "x") }, true, nil, ""},
+		{"HourlyAt", func() *JobBuilder { return newJobBuilder(nil).HourlyAt(5) }, false, nil, "5 * * * *"},
+		{"Daily", func() *JobBuilder { return newJobBuilder(nil).Daily() }, false, nil, "0 0 * * *"},
+		{"Weekly", func() *JobBuilder { return newJobBuilder(nil).Weekly() }, false, nil, "0 0 * * 0"},
+		{"Quarterly", func() *JobBuilder { return newJobBuilder(nil).Quarterly() }, false, nil, "0 0 1 1,4,7,10 *"},
+		{"Yearly", func() *JobBuilder { return newJobBuilder(nil).Yearly() }, false, nil, "0 0 1 1 *"},
 	}
 
 	for _, tc := range cases {
@@ -149,7 +149,7 @@ func TestCommandMetadataAndRunNowSkipsExec(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s)
+	f := newJobBuilder(s)
 	f.Cron("0 0 * * *").Command("hello:world", "foo", "bar")
 
 	job := f.Job()
@@ -176,7 +176,7 @@ func TestCommandNoArgsMetadataAndReset(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s)
+	f := newJobBuilder(s)
 	f.Cron("0 0 * * *").Command("hello:world")
 
 	require.NoError(t, f.Job().RunNow())
@@ -194,6 +194,47 @@ func TestCommandNoArgsMetadataAndReset(t *testing.T) {
 	require.Nil(t, f.duration)
 }
 
+func TestExecMetadataAndRunner(t *testing.T) {
+	t.Setenv("APP_ENV", "test")
+	clock := clockwork.NewFakeClock()
+	s := newTestScheduler(clock)
+	defer s.Shutdown()
+
+	var gotExe string
+	var gotArgs []string
+	done := make(chan struct{})
+	runner := CommandRunnerFunc(func(_ context.Context, exe string, args []string) error {
+		gotExe = exe
+		gotArgs = append([]string{}, args...)
+		close(done)
+		return nil
+	})
+
+	f := newJobBuilder(s).WithCommandRunner(runner)
+	f.Cron("0 0 * * *").Exec("/usr/bin/env", "echo", "hello")
+
+	require.NotNil(t, f.Job())
+	require.NoError(t, f.Job().RunNow())
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("exec runner did not run")
+	}
+	require.Equal(t, "/usr/bin/env", gotExe)
+	require.Equal(t, []string{"echo", "hello"}, gotArgs)
+
+	meta := f.JobMetadata()
+	require.Len(t, meta, 1)
+	for _, v := range meta {
+		require.Equal(t, string(jobTargetExec), v.TargetKind)
+		require.Equal(t, "/usr/bin/env echo hello", v.Command)
+		require.Equal(t, string(jobScheduleCron), v.ScheduleType)
+		require.Equal(t, "0 0 * * *", v.Schedule)
+		require.Contains(t, v.Tags, "env=test")
+		require.Contains(t, v.Tags, "args=\"echo hello\"")
+	}
+}
+
 func TestFunctionMetadataFriendlyNameAndRetainState(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 	s := newTestScheduler(clock)
@@ -202,7 +243,7 @@ func TestFunctionMetadataFriendlyNameAndRetainState(t *testing.T) {
 	var called atomic.Int32
 	fn := func() { called.Add(1) }
 
-	f := NewJobBuilder(s).
+	f := newJobBuilder(s).
 		RetainState().
 		EverySecond().
 		Do(fn)
@@ -227,7 +268,7 @@ func TestIntervalMetadataAndTags(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s).
+	f := newJobBuilder(s).
 		EverySecond().
 		Do(sampleHandler)
 
@@ -248,7 +289,7 @@ func TestJobMetadataCopyIsDefensive(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s).
+	f := newJobBuilder(s).
 		EverySecond().
 		Do(sampleHandler)
 
@@ -270,7 +311,7 @@ func TestOverlapAndLockerOptions(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s).
+	f := newJobBuilder(s).
 		WithoutOverlapping().
 		WithoutOverlappingWithLocker(stubLocker{}).
 		EverySecond().
@@ -280,7 +321,7 @@ func TestOverlapAndLockerOptions(t *testing.T) {
 }
 
 func TestDescribeScheduleVariants(t *testing.T) {
-	f := NewJobBuilder(nil)
+	f := newJobBuilder(nil)
 	kind, val := f.describeSchedule()
 	require.Equal(t, jobScheduleUnknown, kind)
 	require.Equal(t, "", val)
@@ -318,7 +359,7 @@ func TestBuildCommandString(t *testing.T) {
 }
 
 func TestTimezoneSetter(t *testing.T) {
-	f := NewJobBuilder(nil)
+	f := newJobBuilder(nil)
 	out := f.Timezone("UTC")
 	require.Equal(t, "UTC", out.timezone)
 }
@@ -345,33 +386,33 @@ func TestAllDurationBuilders(t *testing.T) {
 		fn   func() *JobBuilder
 		want time.Duration
 	}{
-		{"Minutes", func() *JobBuilder { return NewJobBuilder(nil).Every(3).Minutes() }, 3 * time.Minute},
-		{"Hours", func() *JobBuilder { return NewJobBuilder(nil).Every(2).Hours() }, 2 * time.Hour},
-		{"EveryTwoSeconds", func() *JobBuilder { return NewJobBuilder(nil).EveryTwoSeconds() }, 2 * time.Second},
-		{"EveryFiveSeconds", func() *JobBuilder { return NewJobBuilder(nil).EveryFiveSeconds() }, 5 * time.Second},
-		{"EveryTenSeconds", func() *JobBuilder { return NewJobBuilder(nil).EveryTenSeconds() }, 10 * time.Second},
-		{"EveryFifteenSeconds", func() *JobBuilder { return NewJobBuilder(nil).EveryFifteenSeconds() }, 15 * time.Second},
-		{"EveryTwentySeconds", func() *JobBuilder { return NewJobBuilder(nil).EveryTwentySeconds() }, 20 * time.Second},
-		{"EveryThirtySeconds", func() *JobBuilder { return NewJobBuilder(nil).EveryThirtySeconds() }, 30 * time.Second},
-		{"EveryMinute", func() *JobBuilder { return NewJobBuilder(nil).EveryMinute() }, time.Minute},
-		{"EveryTwoMinutes", func() *JobBuilder { return NewJobBuilder(nil).EveryTwoMinutes() }, 2 * time.Minute},
-		{"EveryThreeMinutes", func() *JobBuilder { return NewJobBuilder(nil).EveryThreeMinutes() }, 3 * time.Minute},
-		{"EveryFourMinutes", func() *JobBuilder { return NewJobBuilder(nil).EveryFourMinutes() }, 4 * time.Minute},
-		{"EveryFiveMinutes", func() *JobBuilder { return NewJobBuilder(nil).EveryFiveMinutes() }, 5 * time.Minute},
-		{"EveryTenMinutes", func() *JobBuilder { return NewJobBuilder(nil).EveryTenMinutes() }, 10 * time.Minute},
-		{"EveryFifteenMinutes", func() *JobBuilder { return NewJobBuilder(nil).EveryFifteenMinutes() }, 15 * time.Minute},
-		{"EveryThirtyMinutes", func() *JobBuilder { return NewJobBuilder(nil).EveryThirtyMinutes() }, 30 * time.Minute},
-		{"Hourly", func() *JobBuilder { return NewJobBuilder(nil).Hourly() }, time.Hour},
-		{"EveryOddHour", func() *JobBuilder { return NewJobBuilder(nil).EveryOddHour(5) }, 0},
-		{"EveryTwoHours", func() *JobBuilder { return NewJobBuilder(nil).EveryTwoHours(10) }, 0},
-		{"EveryThreeHours", func() *JobBuilder { return NewJobBuilder(nil).EveryThreeHours(7) }, 0},
-		{"EveryFourHours", func() *JobBuilder { return NewJobBuilder(nil).EveryFourHours(9) }, 0},
-		{"EverySixHours", func() *JobBuilder { return NewJobBuilder(nil).EverySixHours(11) }, 0},
-		{"TwiceDaily", func() *JobBuilder { return NewJobBuilder(nil).TwiceDaily(1, 13) }, 0},
-		{"Weekly", func() *JobBuilder { return NewJobBuilder(nil).Weekly() }, 0},
-		{"Monthly", func() *JobBuilder { return NewJobBuilder(nil).Monthly() }, 0},
-		{"Quarterly", func() *JobBuilder { return NewJobBuilder(nil).Quarterly() }, 0},
-		{"Yearly", func() *JobBuilder { return NewJobBuilder(nil).Yearly() }, 0},
+		{"Minutes", func() *JobBuilder { return newJobBuilder(nil).Every(3).Minutes() }, 3 * time.Minute},
+		{"Hours", func() *JobBuilder { return newJobBuilder(nil).Every(2).Hours() }, 2 * time.Hour},
+		{"EveryTwoSeconds", func() *JobBuilder { return newJobBuilder(nil).EveryTwoSeconds() }, 2 * time.Second},
+		{"EveryFiveSeconds", func() *JobBuilder { return newJobBuilder(nil).EveryFiveSeconds() }, 5 * time.Second},
+		{"EveryTenSeconds", func() *JobBuilder { return newJobBuilder(nil).EveryTenSeconds() }, 10 * time.Second},
+		{"EveryFifteenSeconds", func() *JobBuilder { return newJobBuilder(nil).EveryFifteenSeconds() }, 15 * time.Second},
+		{"EveryTwentySeconds", func() *JobBuilder { return newJobBuilder(nil).EveryTwentySeconds() }, 20 * time.Second},
+		{"EveryThirtySeconds", func() *JobBuilder { return newJobBuilder(nil).EveryThirtySeconds() }, 30 * time.Second},
+		{"EveryMinute", func() *JobBuilder { return newJobBuilder(nil).EveryMinute() }, time.Minute},
+		{"EveryTwoMinutes", func() *JobBuilder { return newJobBuilder(nil).EveryTwoMinutes() }, 2 * time.Minute},
+		{"EveryThreeMinutes", func() *JobBuilder { return newJobBuilder(nil).EveryThreeMinutes() }, 3 * time.Minute},
+		{"EveryFourMinutes", func() *JobBuilder { return newJobBuilder(nil).EveryFourMinutes() }, 4 * time.Minute},
+		{"EveryFiveMinutes", func() *JobBuilder { return newJobBuilder(nil).EveryFiveMinutes() }, 5 * time.Minute},
+		{"EveryTenMinutes", func() *JobBuilder { return newJobBuilder(nil).EveryTenMinutes() }, 10 * time.Minute},
+		{"EveryFifteenMinutes", func() *JobBuilder { return newJobBuilder(nil).EveryFifteenMinutes() }, 15 * time.Minute},
+		{"EveryThirtyMinutes", func() *JobBuilder { return newJobBuilder(nil).EveryThirtyMinutes() }, 30 * time.Minute},
+		{"Hourly", func() *JobBuilder { return newJobBuilder(nil).Hourly() }, time.Hour},
+		{"EveryOddHour", func() *JobBuilder { return newJobBuilder(nil).EveryOddHour(5) }, 0},
+		{"EveryTwoHours", func() *JobBuilder { return newJobBuilder(nil).EveryTwoHours(10) }, 0},
+		{"EveryThreeHours", func() *JobBuilder { return newJobBuilder(nil).EveryThreeHours(7) }, 0},
+		{"EveryFourHours", func() *JobBuilder { return newJobBuilder(nil).EveryFourHours(9) }, 0},
+		{"EverySixHours", func() *JobBuilder { return newJobBuilder(nil).EverySixHours(11) }, 0},
+		{"TwiceDaily", func() *JobBuilder { return newJobBuilder(nil).TwiceDaily(1, 13) }, 0},
+		{"Weekly", func() *JobBuilder { return newJobBuilder(nil).Weekly() }, 0},
+		{"Monthly", func() *JobBuilder { return newJobBuilder(nil).Monthly() }, 0},
+		{"Quarterly", func() *JobBuilder { return newJobBuilder(nil).Quarterly() }, 0},
+		{"Yearly", func() *JobBuilder { return newJobBuilder(nil).Yearly() }, 0},
 	}
 
 	for _, tc := range tests {
@@ -392,7 +433,7 @@ func TestCommandWithExistingErrorSkipsScheduling(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s)
+	f := newJobBuilder(s)
 	f.err = fmt.Errorf("preset error")
 	f.Command("noop")
 	require.Nil(t, f.Job())
@@ -400,10 +441,10 @@ func TestCommandWithExistingErrorSkipsScheduling(t *testing.T) {
 }
 
 func TestWeeklyOnHourAndMinuteErrors(t *testing.T) {
-	f := NewJobBuilder(nil).WeeklyOn(1, "bad:30")
+	f := newJobBuilder(nil).WeeklyOn(1, "bad:30")
 	require.Error(t, f.Error())
 
-	f2 := NewJobBuilder(nil).WeeklyOn(1, "10:xx")
+	f2 := newJobBuilder(nil).WeeklyOn(1, "10:xx")
 	require.Error(t, f2.Error())
 }
 
@@ -411,7 +452,7 @@ func TestDoWithoutScheduleErrors(t *testing.T) {
 	s := newTestScheduler(clockwork.NewFakeClock())
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s).Do(func() {})
+	f := newJobBuilder(s).Do(func() {})
 	require.Error(t, f.Error())
 	require.Nil(t, f.Job())
 }
@@ -432,7 +473,7 @@ func (j stubJob) Tags() []string                    { return j.tags }
 
 func TestRecordJobFallbacks(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
-	f := NewJobBuilder(nil)
+	f := newJobBuilder(nil)
 	f.targetKind = jobTargetCommand
 	f.name = "cmd"
 	f.commandArgs = []string{"a"}
@@ -458,7 +499,7 @@ func TestCommandRunNowWithLateError(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s)
+	f := newJobBuilder(s)
 	f.Cron("0 0 * * *").Command("hello:world")
 
 	f.err = fmt.Errorf("late err")
@@ -469,7 +510,7 @@ func TestDoWithPresetErrorSkipsScheduling(t *testing.T) {
 	s := newTestScheduler(clockwork.NewFakeClock())
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s)
+	f := newJobBuilder(s)
 	f.err = fmt.Errorf("boom")
 	f.Do(func() {})
 	require.Nil(t, f.Job())
@@ -482,7 +523,7 @@ func TestHooksRunForFunctionTasks(t *testing.T) {
 
 	var before, after, success atomic.Bool
 
-	f := NewJobBuilder(s)
+	f := newJobBuilder(s)
 	f.Before(func() { before.Store(true) }).
 		After(func() { after.Store(true) }).
 		OnSuccess(func() { success.Store(true) }).
@@ -497,7 +538,7 @@ func TestHooksRunForFunctionTasks(t *testing.T) {
 }
 
 func TestDaysOfMonth(t *testing.T) {
-	f := NewJobBuilder(nil).DaysOfMonth([]int{1, 10, 20}, "13:00")
+	f := newJobBuilder(nil).DaysOfMonth([]int{1, 10, 20}, "13:00")
 	require.Equal(t, "0 13 1,10,20 * *", f.CronExpr())
 }
 
@@ -515,25 +556,25 @@ func TestDayConstraintsAndBetween(t *testing.T) {
 
 	var weekdayCalled, weekendCalled, betweenCalled, unlessBetweenSkipped atomic.Bool
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		Timezone("UTC").
 		Weekdays().
 		EverySecond().
 		Do(func() { weekdayCalled.Store(true) })
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		Timezone("UTC").
 		Weekends().
 		EverySecond().
 		Do(func() { weekendCalled.Store(true) })
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		Timezone("UTC").
 		Between("08:00", "10:00").
 		EverySecond().
 		Do(func() { betweenCalled.Store(true) })
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		Timezone("UTC").
 		UnlessBetween("08:00", "10:00").
 		EverySecond().
@@ -560,13 +601,13 @@ func TestSpecificDayHelpers(t *testing.T) {
 
 	var mondayCalled, tuesdayCalled atomic.Bool
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		Timezone("UTC").
 		Mondays().
 		EverySecond().
 		Do(func() { mondayCalled.Store(true) })
 
-	NewJobBuilder(s).
+	newJobBuilder(s).
 		Timezone("UTC").
 		Tuesdays().
 		EverySecond().
@@ -591,8 +632,8 @@ func TestSundayHelper(t *testing.T) {
 
 	var sundayCalled, saturdayCalled atomic.Bool
 
-	NewJobBuilder(s).Timezone("UTC").Sundays().EverySecond().Do(func() { sundayCalled.Store(true) })
-	NewJobBuilder(s).Timezone("UTC").Saturdays().EverySecond().Do(func() { saturdayCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Sundays().EverySecond().Do(func() { sundayCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Saturdays().EverySecond().Do(func() { saturdayCalled.Store(true) })
 
 	waitForJob(clock, time.Second)
 
@@ -613,9 +654,9 @@ func TestMidweekHelpers(t *testing.T) {
 
 	var wedCalled, thuCalled, friCalled atomic.Bool
 
-	NewJobBuilder(s).Timezone("UTC").Wednesdays().EverySecond().Do(func() { wedCalled.Store(true) })
-	NewJobBuilder(s).Timezone("UTC").Thursdays().EverySecond().Do(func() { thuCalled.Store(true) })
-	NewJobBuilder(s).Timezone("UTC").Fridays().EverySecond().Do(func() { friCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Wednesdays().EverySecond().Do(func() { wedCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Thursdays().EverySecond().Do(func() { thuCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Fridays().EverySecond().Do(func() { friCalled.Store(true) })
 
 	waitForJob(clock, time.Second)
 
@@ -630,7 +671,7 @@ func TestTimezoneAppliedToCron(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	f := NewJobBuilder(s).
+	f := newJobBuilder(s).
 		Timezone("America/Chicago").
 		Cron("0 12 * * *").
 		Command("hello:world")
@@ -644,7 +685,7 @@ func TestTimezoneAppliedToCron(t *testing.T) {
 }
 
 func TestDaysOfMonthInvalid(t *testing.T) {
-	f := NewJobBuilder(nil).DaysOfMonth([]int{1, 2}, "bad")
+	f := newJobBuilder(nil).DaysOfMonth([]int{1, 2}, "bad")
 	require.Error(t, f.Error())
 }
 
@@ -661,8 +702,8 @@ func TestBetweenCrossesMidnight(t *testing.T) {
 
 	var betweenCalled, unlessBetweenCalled atomic.Bool
 
-	NewJobBuilder(s).Timezone("UTC").Between("23:00", "02:00").EverySecond().Do(func() { betweenCalled.Store(true) })
-	NewJobBuilder(s).Timezone("UTC").UnlessBetween("23:00", "02:00").EverySecond().Do(func() { unlessBetweenCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Between("23:00", "02:00").EverySecond().Do(func() { betweenCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").UnlessBetween("23:00", "02:00").EverySecond().Do(func() { unlessBetweenCalled.Store(true) })
 
 	waitForJob(clock, time.Second)
 
@@ -671,7 +712,7 @@ func TestBetweenCrossesMidnight(t *testing.T) {
 }
 
 func TestAddWhenSkipComposition(t *testing.T) {
-	f := NewJobBuilder(nil)
+	f := newJobBuilder(nil)
 	f.When(func() bool { return true })
 	f.When(func() bool { return false })
 	require.False(t, f.whenFunc())
@@ -710,11 +751,11 @@ func TestLockerFuncAndLockFunc(t *testing.T) {
 }
 
 func TestBetweenInvalidInputs(t *testing.T) {
-	b := NewJobBuilder(nil)
+	b := newJobBuilder(nil)
 	b.Between("bad", "10:00")
 	require.Error(t, b.Error())
 
-	b = NewJobBuilder(nil)
+	b = newJobBuilder(nil)
 	b.UnlessBetween("09:00", "bad")
 	require.Error(t, b.Error())
 }
@@ -741,7 +782,7 @@ func TestRenderHelpersEdges(t *testing.T) {
 }
 
 func TestAddWhenSkipNilAndCombine(t *testing.T) {
-	b := NewJobBuilder(nil)
+	b := newJobBuilder(nil)
 	b.addWhen(nil)
 	require.Nil(t, b.whenFunc)
 
@@ -766,7 +807,7 @@ func TestAddWhenSkipNilAndCombine(t *testing.T) {
 }
 
 func TestLocationInvalidZoneFallsBack(t *testing.T) {
-	b := NewJobBuilder(nil).Timezone("Invalid/Zone")
+	b := newJobBuilder(nil).Timezone("Invalid/Zone")
 	require.Equal(t, time.Local, b.location())
 }
 
@@ -778,13 +819,13 @@ func TestFriendlyFuncNameNil(t *testing.T) {
 func TestBetweenUnlessBetweenValid(t *testing.T) {
 	fixed := func() time.Time { return time.Date(2024, 1, 2, 1, 30, 0, 0, time.UTC) }
 
-	b := NewJobBuilder(nil).Timezone("UTC").WithNowFunc(fixed).Between("01:00", "02:00")
+	b := newJobBuilder(nil).Timezone("UTC").WithNowFunc(fixed).Between("01:00", "02:00")
 	require.NoError(t, b.Error())
 	require.NotNil(t, b.whenFunc)
 	// 01:30 is inside window
 	require.True(t, b.whenFunc())
 
-	b = NewJobBuilder(nil).Timezone("UTC").WithNowFunc(fixed).UnlessBetween("22:00", "23:00")
+	b = newJobBuilder(nil).Timezone("UTC").WithNowFunc(fixed).UnlessBetween("22:00", "23:00")
 	require.NoError(t, b.Error())
 	require.NotNil(t, b.skipFunc)
 	// 01:30 is outside skip window
@@ -793,7 +834,7 @@ func TestBetweenUnlessBetweenValid(t *testing.T) {
 
 func TestCommandRunInBackgroundBranch(t *testing.T) {
 	t.Setenv("SCHEDULER_TEST_NO_EXEC", "1")
-	b := NewJobBuilder(newTestScheduler(clockwork.NewFakeClock()))
+	b := newJobBuilder(newTestScheduler(clockwork.NewFakeClock()))
 	b.RunInBackground().Cron("0 0 * * *").Command("noop")
 	require.NotNil(t, b.Job())
 }
@@ -803,21 +844,21 @@ func TestDoWithFiltersSkipping(t *testing.T) {
 	s := newTestScheduler(clockwork.NewFakeClock())
 	defer s.Shutdown()
 
-	b := NewJobBuilder(s).Environments("production").EverySecond().Do(func() {})
+	b := newJobBuilder(s).Environments("production").EverySecond().Do(func() {})
 	require.Nil(t, b.Job())
 
-	b = NewJobBuilder(s).EverySecond().When(func() bool { return false }).Do(func() {})
+	b = newJobBuilder(s).EverySecond().When(func() bool { return false }).Do(func() {})
 	require.Nil(t, b.Job())
 }
 
 func TestDoWithoutSchedule(t *testing.T) {
-	b := NewJobBuilder(nil)
+	b := newJobBuilder(nil)
 	b.Do(func() {})
 	require.Error(t, b.Error())
 }
 
 func TestRecordJobDefaults(t *testing.T) {
-	b := NewJobBuilder(nil)
+	b := newJobBuilder(nil)
 	b.targetKind = ""
 	b.jobMetadata = nil
 
@@ -852,7 +893,7 @@ func TestGetJobsListCoverage(t *testing.T) {
 		name: "",
 		tags: []string{"cron=0 0 * * *"},
 	}
-	b := NewJobBuilder(nil)
+	b := newJobBuilder(nil)
 	b.scheduler = stubSchedulerAdapter{jobs: []gocron.Job{cronJob}}
 	entries := b.getJobsList()
 	require.Len(t, entries, 1)
@@ -882,6 +923,6 @@ func TestFriendlyFuncNameAnonAndLocationValid(t *testing.T) {
 	name := friendlyFuncName(func() {})
 	require.Contains(t, name, "anon func")
 
-	loc := NewJobBuilder(nil).Timezone("America/New_York").location()
+	loc := newJobBuilder(nil).Timezone("America/New_York").location()
 	require.Equal(t, "America/New_York", loc.String())
 }

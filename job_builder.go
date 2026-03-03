@@ -113,23 +113,18 @@ type taskHooks struct {
 	OnFailure func()
 }
 
-// NewJobBuilder creates a new JobBuilder with the provided scheduler.
-// @group Construction
-//
-// Example: create a builder and schedule a heartbeat
-//
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//	scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
-func NewJobBuilder(s gocron.Scheduler) *JobBuilder {
+func newJobBuilder(s SchedulerAdapter) *JobBuilder {
 	return &JobBuilder{
-		scheduler:     gocronSchedulerAdapter{s: s},
+		scheduler:     s,
 		jobMetadata:   make(map[uuid.UUID]JobMetadata),
 		targetKind:    jobTargetFunction,
 		commandRunner: execCommandRunner{},
 		now:           nowFunc,
 	}
+}
+
+func NewJobBuilder(s SchedulerAdapter) *JobBuilder {
+	return newJobBuilder(s)
 }
 
 type jobScheduleKind string
@@ -145,6 +140,7 @@ type jobTargetKind string
 const (
 	jobTargetFunction jobTargetKind = "function"
 	jobTargetCommand  jobTargetKind = "command"
+	jobTargetExec     jobTargetKind = "exec"
 )
 
 // JobMetadata captures stored job details keyed by job ID.
@@ -164,11 +160,7 @@ type JobMetadata struct {
 //
 // Example: reuse interval configuration for multiple jobs
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	builder := scheduler.NewJobBuilder(s).EverySecond().RetainState()
+//	builder := scheduler.New().EverySecond().RetainState()
 //	builder.Do(func() {})
 //	builder.Do(func() {})
 func (j *JobBuilder) RetainState() *JobBuilder {
@@ -197,7 +189,7 @@ func (j *JobBuilder) buildTags(jobName string) []string {
 		tags = append(tags, "name="+jobName)
 	}
 
-	// Args/flags provided via Command()
+	// Args/flags provided via Command/Exec.
 	if len(j.extraTags) > 0 {
 		tags = append(tags, j.extraTags...)
 	}
@@ -206,18 +198,11 @@ func (j *JobBuilder) buildTags(jobName string) []string {
 }
 
 // Do schedules the job with the provided task function.
-// @group Scheduling
+// @group Triggers
 //
 // Example: create a named cron job
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).
-//	Name("cleanup").
-//	Cron("0 0 * * *").
-//	Do(func() {})
+//	scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func() {})
 func (j *JobBuilder) Do(task func()) *JobBuilder {
 	if j.err != nil {
 		return j
@@ -343,11 +328,7 @@ func (j *JobBuilder) resetState() {
 //
 // Example: prevent overlapping runs of a slow task
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).
+//	scheduler.New().
 //		WithoutOverlapping().
 //		EveryFiveSeconds().
 //		Do(func() { time.Sleep(7 * time.Second) })
@@ -361,30 +342,32 @@ func (j *JobBuilder) WithoutOverlapping() *JobBuilder {
 //
 // Example: validate a malformed schedule
 //
-//	builder := scheduler.NewJobBuilder(nil).DailyAt("bad")
+//	builder := scheduler.New().DailyAt("bad")
 //	fmt.Println(builder.Error())
+//	// Output: invalid DailyAt time format: invalid time format (expected HH:MM): "bad"
 func (j *JobBuilder) Error() error {
 	return j.err
 }
 
 // Cron sets the cron expression for the job.
-// @group Scheduling
+// @group Triggers
 //
 // Example: configure a cron expression
 //
-//	builder := scheduler.NewJobBuilder(nil).Cron("15 3 * * *")
+//	builder := scheduler.New().Cron("15 3 * * *")
 //	fmt.Println(builder.CronExpr())
+//	// Output: 15 3 * * *
 func (j *JobBuilder) Cron(expr string) *JobBuilder {
 	j.cronExpr = expr
 	return j
 }
 
 // every sets the duration for the job to run at regular intervals.
-// @group Scheduling
+// @group Intervals
 //
 // Example: build a duration interval
 //
-//	_ = scheduler.NewJobBuilder(nil).Every(5).Seconds()
+//	_ = scheduler.New().Every(5).Seconds()
 //	_ = time.Second
 func (j *JobBuilder) every(duration time.Duration) *JobBuilder {
 	j.duration = &duration
@@ -392,13 +375,11 @@ func (j *JobBuilder) every(duration time.Duration) *JobBuilder {
 }
 
 // Every schedules a job to run every X seconds, minutes, or hours.
-// @group Scheduling
+// @group Intervals
 //
 // Example: fluently choose an interval
 //
-//	scheduler.NewJobBuilder(nil).
-//		Every(10).
-//		Minutes()
+//	scheduler.New().Every(10).Minutes()
 func (j *JobBuilder) Every(duration int) *FluentEvery {
 	return &FluentEvery{
 		base:     j,
@@ -413,342 +394,271 @@ type FluentEvery struct {
 }
 
 // Seconds schedules the job to run every X seconds.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run a task every few seconds
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).
-//		Every(3).
-//		Seconds().
-//		Do(func() {})
+//	scheduler.New().Every(3).Seconds().Do(func() {})
 func (fe *FluentEvery) Seconds() *JobBuilder {
 	return fe.base.every(time.Duration(fe.interval) * time.Second)
 }
 
 // Minutes schedules the job to run every X minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: chain a minute-based interval
 //
-//	scheduler.NewJobBuilder(nil).Every(15).Minutes()
+//	scheduler.New().Every(15).Minutes()
 func (fe *FluentEvery) Minutes() *JobBuilder {
 	return fe.base.every(time.Duration(fe.interval) * time.Minute)
 }
 
 // Hours schedules the job to run every X hours.
-// @group Scheduling
+// @group Intervals
 //
 // Example: build an hourly cadence
 //
-//	scheduler.NewJobBuilder(nil).Every(6).Hours()
+//	scheduler.New().Every(6).Hours()
 func (fe *FluentEvery) Hours() *JobBuilder {
 	return fe.base.every(time.Duration(fe.interval) * time.Hour)
 }
 
 // EverySecond schedules the job to run every 1 second.
-// @group Scheduling
+// @group Intervals
 //
 // Example: heartbeat job each second
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
+//	scheduler.New().EverySecond().Do(func() {})
 func (j *JobBuilder) EverySecond() *JobBuilder {
 	return j.every(1 * time.Second)
 }
 
 // EveryTwoSeconds schedules the job to run every 2 seconds.
-// @group Scheduling
+// @group Intervals
 //
 // Example: throttle a task to two seconds
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryTwoSeconds().Do(func() {})
+//	scheduler.New().EveryTwoSeconds().Do(func() {})
 func (j *JobBuilder) EveryTwoSeconds() *JobBuilder {
 	return j.every(2 * time.Second)
 }
 
 // EveryFiveSeconds schedules the job to run every 5 seconds.
-// @group Scheduling
+// @group Intervals
 //
 // Example: space out work every five seconds
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryFiveSeconds().Do(func() {})
+//	scheduler.New().EveryFiveSeconds().Do(func() {})
 func (j *JobBuilder) EveryFiveSeconds() *JobBuilder {
 	return j.every(5 * time.Second)
 }
 
 // EveryTenSeconds schedules the job to run every 10 seconds.
-// @group Scheduling
+// @group Intervals
 //
 // Example: poll every ten seconds
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryTenSeconds().Do(func() {})
+//	scheduler.New().EveryTenSeconds().Do(func() {})
 func (j *JobBuilder) EveryTenSeconds() *JobBuilder {
 	return j.every(10 * time.Second)
 }
 
 // EveryFifteenSeconds schedules the job to run every 15 seconds.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run at fifteen-second cadence
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryFifteenSeconds().Do(func() {})
+//	scheduler.New().EveryFifteenSeconds().Do(func() {})
 func (j *JobBuilder) EveryFifteenSeconds() *JobBuilder {
 	return j.every(15 * time.Second)
 }
 
 // EveryTwentySeconds schedules the job to run every 20 seconds.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run once every twenty seconds
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryTwentySeconds().Do(func() {})
+//	scheduler.New().EveryTwentySeconds().Do(func() {})
 func (j *JobBuilder) EveryTwentySeconds() *JobBuilder {
 	return j.every(20 * time.Second)
 }
 
 // EveryThirtySeconds schedules the job to run every 30 seconds.
-// @group Scheduling
+// @group Intervals
 //
 // Example: execute every thirty seconds
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryThirtySeconds().Do(func() {})
+//	scheduler.New().EveryThirtySeconds().Do(func() {})
 func (j *JobBuilder) EveryThirtySeconds() *JobBuilder {
 	return j.every(30 * time.Second)
 }
 
 // EveryMinute schedules the job to run every 1 minute.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run a task each minute
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryMinute().Do(func() {})
+//	scheduler.New().EveryMinute().Do(func() {})
 func (j *JobBuilder) EveryMinute() *JobBuilder {
 	return j.every(1 * time.Minute)
 }
 
 // EveryTwoMinutes schedules the job to run every 2 minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: job that runs every two minutes
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryTwoMinutes().Do(func() {})
+//	scheduler.New().EveryTwoMinutes().Do(func() {})
 func (j *JobBuilder) EveryTwoMinutes() *JobBuilder {
 	return j.every(2 * time.Minute)
 }
 
 // EveryThreeMinutes schedules the job to run every 3 minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every three minutes
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryThreeMinutes().Do(func() {})
+//	scheduler.New().EveryThreeMinutes().Do(func() {})
 func (j *JobBuilder) EveryThreeMinutes() *JobBuilder {
 	return j.every(3 * time.Minute)
 }
 
 // EveryFourMinutes schedules the job to run every 4 minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every four minutes
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryFourMinutes().Do(func() {})
+//	scheduler.New().EveryFourMinutes().Do(func() {})
 func (j *JobBuilder) EveryFourMinutes() *JobBuilder {
 	return j.every(4 * time.Minute)
 }
 
 // EveryFiveMinutes schedules the job to run every 5 minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every five minutes
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryFiveMinutes().Do(func() {})
+//	scheduler.New().EveryFiveMinutes().Do(func() {})
 func (j *JobBuilder) EveryFiveMinutes() *JobBuilder {
 	return j.every(5 * time.Minute)
 }
 
 // EveryTenMinutes schedules the job to run every 10 minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every ten minutes
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryTenMinutes().Do(func() {})
+//	scheduler.New().EveryTenMinutes().Do(func() {})
 func (j *JobBuilder) EveryTenMinutes() *JobBuilder {
 	return j.every(10 * time.Minute)
 }
 
 // EveryFifteenMinutes schedules the job to run every 15 minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every fifteen minutes
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryFifteenMinutes().Do(func() {})
+//	scheduler.New().EveryFifteenMinutes().Do(func() {})
 func (j *JobBuilder) EveryFifteenMinutes() *JobBuilder {
 	return j.every(15 * time.Minute)
 }
 
 // EveryThirtyMinutes schedules the job to run every 30 minutes.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every thirty minutes
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).EveryThirtyMinutes().Do(func() {})
+//	scheduler.New().EveryThirtyMinutes().Do(func() {})
 func (j *JobBuilder) EveryThirtyMinutes() *JobBuilder {
 	return j.every(30 * time.Minute)
 }
 
 // Hourly schedules the job to run every hour.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run something hourly
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).Hourly().Do(func() {})
+//	scheduler.New().Hourly().Do(func() {})
 func (j *JobBuilder) Hourly() *JobBuilder {
 	return j.every(1 * time.Hour)
 }
 
 // HourlyAt schedules the job to run every hour at the specified minute.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run at the 5th minute of each hour
 //
-//	scheduler.NewJobBuilder(nil).HourlyAt(5)
+//	scheduler.New().HourlyAt(5)
 func (j *JobBuilder) HourlyAt(minute int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("%d * * * *", minute))
 }
 
 // EveryOddHour schedules the job to run every odd-numbered hour at the specified minute.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every odd hour
 //
-//	scheduler.NewJobBuilder(nil).EveryOddHour(10)
+//	scheduler.New().EveryOddHour(10)
 func (j *JobBuilder) EveryOddHour(minute int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("%d 1-23/2 * * *", minute))
 }
 
 // EveryTwoHours schedules the job to run every two hours at the specified minute.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every two hours
 //
-//	scheduler.NewJobBuilder(nil).EveryTwoHours(15)
+//	scheduler.New().EveryTwoHours(15)
 func (j *JobBuilder) EveryTwoHours(minute int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("%d */2 * * *", minute))
 }
 
 // EveryThreeHours schedules the job to run every three hours at the specified minute.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every three hours
 //
-//	scheduler.NewJobBuilder(nil).EveryThreeHours(20)
+//	scheduler.New().EveryThreeHours(20)
 func (j *JobBuilder) EveryThreeHours(minute int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("%d */3 * * *", minute))
 }
 
 // EveryFourHours schedules the job to run every four hours at the specified minute.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every four hours
 //
-//	scheduler.NewJobBuilder(nil).EveryFourHours(25)
+//	scheduler.New().EveryFourHours(25)
 func (j *JobBuilder) EveryFourHours(minute int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("%d */4 * * *", minute))
 }
 
 // EverySixHours schedules the job to run every six hours at the specified minute.
-// @group Scheduling
+// @group Intervals
 //
 // Example: run every six hours
 //
-//	scheduler.NewJobBuilder(nil).EverySixHours(30)
+//	scheduler.New().EverySixHours(30)
 func (j *JobBuilder) EverySixHours(minute int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("%d */6 * * *", minute))
 }
 
 // Daily schedules the job to run once per day at midnight.
-// @group Scheduling
+// @group Calendar
 //
 // Example: nightly task
 //
-//	scheduler.NewJobBuilder(nil).Daily()
+//	scheduler.New().Daily()
 func (j *JobBuilder) Daily() *JobBuilder {
 	return j.Cron("0 0 * * *")
 }
 
 // DailyAt schedules the job to run daily at a specific time (e.g., "13:00").
-// @group Scheduling
+// @group Calendar
 //
 // Example: run at lunch time daily
 //
-//	scheduler.NewJobBuilder(nil).DailyAt("12:30")
+//	scheduler.New().DailyAt("12:30")
 func (j *JobBuilder) DailyAt(hm string) *JobBuilder {
 	hour, minute, err := parseHourMinute(hm)
 	if err != nil {
@@ -759,42 +669,42 @@ func (j *JobBuilder) DailyAt(hm string) *JobBuilder {
 }
 
 // TwiceDaily schedules the job to run daily at two specified hours (e.g., 1 and 13).
-// @group Scheduling
+// @group Calendar
 //
 // Example: run two times per day
 //
-//	scheduler.NewJobBuilder(nil).TwiceDaily(1, 13)
+//	scheduler.New().TwiceDaily(1, 13)
 func (j *JobBuilder) TwiceDaily(h1, h2 int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("0 %d,%d * * *", h1, h2))
 }
 
 // TwiceDailyAt schedules the job to run daily at two specified times (e.g., 1:15 and 13:15).
-// @group Scheduling
+// @group Calendar
 //
 // Example: run twice daily at explicit minutes
 //
-//	scheduler.NewJobBuilder(nil).TwiceDailyAt(1, 13, 15)
+//	scheduler.New().TwiceDailyAt(1, 13, 15)
 func (j *JobBuilder) TwiceDailyAt(h1, h2, m int) *JobBuilder {
 	return j.Cron(fmt.Sprintf("%d %d,%d * * *", m, h1, h2))
 }
 
 // Weekly schedules the job to run once per week on Sunday at midnight.
-// @group Scheduling
+// @group Calendar
 //
 // Example: weekly maintenance
 //
-//	scheduler.NewJobBuilder(nil).Weekly()
+//	scheduler.New().Weekly()
 func (j *JobBuilder) Weekly() *JobBuilder {
 	return j.Cron("0 0 * * 0")
 }
 
 // WeeklyOn schedules the job to run weekly on a specific day of the week and time.
 // Day uses 0 = Sunday through 6 = Saturday.
-// @group Scheduling
+// @group Calendar
 //
 // Example: run each Monday at 08:00
 //
-//	scheduler.NewJobBuilder(nil).WeeklyOn(1, "8:00")
+//	scheduler.New().WeeklyOn(1, "8:00")
 func (j *JobBuilder) WeeklyOn(day int, hm string) *JobBuilder {
 	parts := strings.Split(hm, ":")
 	if len(parts) != 2 {
@@ -819,21 +729,21 @@ func (j *JobBuilder) WeeklyOn(day int, hm string) *JobBuilder {
 }
 
 // Monthly schedules the job to run on the first day of each month at midnight.
-// @group Scheduling
+// @group Calendar
 //
 // Example: first-of-month billing
 //
-//	scheduler.NewJobBuilder(nil).Monthly()
+//	scheduler.New().Monthly()
 func (j *JobBuilder) Monthly() *JobBuilder {
 	return j.Cron("0 0 1 * *")
 }
 
 // MonthlyOn schedules the job to run on a specific day of the month at a given time.
-// @group Scheduling
+// @group Calendar
 //
 // Example: run on the 15th of each month
 //
-//	scheduler.NewJobBuilder(nil).MonthlyOn(15, "09:30")
+//	scheduler.New().MonthlyOn(15, "09:30")
 func (j *JobBuilder) MonthlyOn(day int, hm string) *JobBuilder {
 	hour, minute, err := parseHourMinute(hm)
 	if err != nil {
@@ -844,11 +754,11 @@ func (j *JobBuilder) MonthlyOn(day int, hm string) *JobBuilder {
 }
 
 // TwiceMonthly schedules the job to run on two specific days of the month at the given time.
-// @group Scheduling
+// @group Calendar
 //
 // Example: run on two days each month
 //
-//	scheduler.NewJobBuilder(nil).TwiceMonthly(1, 15, "10:00")
+//	scheduler.New().TwiceMonthly(1, 15, "10:00")
 func (j *JobBuilder) TwiceMonthly(d1, d2 int, hm string) *JobBuilder {
 	hour, minute, err := parseHourMinute(hm)
 	if err != nil {
@@ -859,11 +769,11 @@ func (j *JobBuilder) TwiceMonthly(d1, d2 int, hm string) *JobBuilder {
 }
 
 // LastDayOfMonth schedules the job to run on the last day of each month at a specific time.
-// @group Scheduling
+// @group Calendar
 //
 // Example: run on the last day of the month
 //
-//	scheduler.NewJobBuilder(nil).LastDayOfMonth("23:30")
+//	scheduler.New().LastDayOfMonth("23:30")
 func (j *JobBuilder) LastDayOfMonth(hm string) *JobBuilder {
 	hour, minute, err := parseHourMinute(hm)
 	if err != nil {
@@ -874,21 +784,21 @@ func (j *JobBuilder) LastDayOfMonth(hm string) *JobBuilder {
 }
 
 // Quarterly schedules the job to run on the first day of each quarter at midnight.
-// @group Scheduling
+// @group Calendar
 //
 // Example: quarterly trigger
 //
-//	scheduler.NewJobBuilder(nil).Quarterly()
+//	scheduler.New().Quarterly()
 func (j *JobBuilder) Quarterly() *JobBuilder {
 	return j.Cron("0 0 1 1,4,7,10 *")
 }
 
 // QuarterlyOn schedules the job to run on a specific day of each quarter at a given time.
-// @group Scheduling
+// @group Calendar
 //
 // Example: quarterly on a specific day
 //
-//	scheduler.NewJobBuilder(nil).QuarterlyOn(3, "12:00")
+//	scheduler.New().QuarterlyOn(3, "12:00")
 func (j *JobBuilder) QuarterlyOn(day int, hm string) *JobBuilder {
 	hour, minute, err := parseHourMinute(hm)
 	if err != nil {
@@ -899,21 +809,21 @@ func (j *JobBuilder) QuarterlyOn(day int, hm string) *JobBuilder {
 }
 
 // Yearly schedules the job to run on January 1st every year at midnight.
-// @group Scheduling
+// @group Calendar
 //
 // Example: yearly trigger
 //
-//	scheduler.NewJobBuilder(nil).Yearly()
+//	scheduler.New().Yearly()
 func (j *JobBuilder) Yearly() *JobBuilder {
 	return j.Cron("0 0 1 1 *")
 }
 
 // YearlyOn schedules the job to run every year on a specific month, day, and time.
-// @group Scheduling
+// @group Calendar
 //
 // Example: yearly on a specific date
 //
-//	scheduler.NewJobBuilder(nil).YearlyOn(12, 25, "06:45")
+//	scheduler.New().YearlyOn(12, 25, "06:45")
 func (j *JobBuilder) YearlyOn(month, day int, hm string) *JobBuilder {
 	hour, minute, err := parseHourMinute(hm)
 	if err != nil {
@@ -928,9 +838,7 @@ func (j *JobBuilder) YearlyOn(month, day int, hm string) *JobBuilder {
 //
 // Example: tag jobs with a timezone
 //
-//	scheduler.NewJobBuilder(nil).
-//		Timezone("America/New_York").
-//		Daily()
+//	scheduler.New().Timezone("America/New_York").Daily()
 func (j *JobBuilder) Timezone(zone string) *JobBuilder {
 	j.timezone = zone
 	return j
@@ -942,13 +850,13 @@ func (j *JobBuilder) Timezone(zone string) *JobBuilder {
 // Example: swap in a custom runner
 //
 //	runner := scheduler.CommandRunnerFunc(func(_ context.Context, exe string, args []string) error {
-//		fmt.Println(exe, args)
+//		_ = exe
+//		_ = args
 //		return nil
 //	})
 //
-//	builder := scheduler.NewJobBuilder(nil).
-//		WithCommandRunner(runner)
-//	fmt.Printf("%T\n", builder)
+//	builder := scheduler.New().WithCommandRunner(runner)
+//	_ = builder
 func (j *JobBuilder) WithCommandRunner(r CommandRunner) *JobBuilder {
 	if r != nil {
 		j.commandRunner = r
@@ -962,7 +870,7 @@ func (j *JobBuilder) WithCommandRunner(r CommandRunner) *JobBuilder {
 // Example: freeze time for predicates
 //
 //	fixed := func() time.Time { return time.Unix(0, 0) }
-//	scheduler.NewJobBuilder(nil).WithNowFunc(fixed)
+//	scheduler.New().WithNowFunc(fixed)
 func (j *JobBuilder) WithNowFunc(fn func() time.Time) *JobBuilder {
 	if fn != nil {
 		j.now = fn
@@ -971,11 +879,11 @@ func (j *JobBuilder) WithNowFunc(fn func() time.Time) *JobBuilder {
 }
 
 // DaysOfMonth schedules the job to run on specific days of the month at a given time.
-// @group Scheduling
+// @group Calendar
 //
 // Example: run on the 5th and 20th of each month
 //
-//	scheduler.NewJobBuilder(nil).DaysOfMonth([]int{5, 20}, "07:15")
+//	scheduler.New().DaysOfMonth([]int{5, 20}, "07:15")
 func (j *JobBuilder) DaysOfMonth(days []int, hm string) *JobBuilder {
 	hour, minute, err := parseHourMinute(hm)
 	if err != nil {
@@ -994,8 +902,9 @@ func (j *JobBuilder) DaysOfMonth(days []int, hm string) *JobBuilder {
 //
 // Example: inspect the stored cron expression
 //
-//	builder := scheduler.NewJobBuilder(nil).Cron("0 9 * * *")
+//	builder := scheduler.New().Cron("0 9 * * *")
 //	fmt.Println(builder.CronExpr())
+//	// Output: 0 9 * * *
 func (j *JobBuilder) CronExpr() string {
 	return j.cronExpr
 }
@@ -1005,12 +914,9 @@ func (j *JobBuilder) CronExpr() string {
 //
 // Example: capture the last job handle
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	b := scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
+//	b := scheduler.New().EverySecond().Do(func() {})
 //	fmt.Println(b.Job() != nil)
+//	// Output: true
 func (j *JobBuilder) Job() gocron.Job {
 	return j.lastJob
 }
@@ -1024,11 +930,8 @@ func (j *JobBuilder) Job() gocron.Job {
 //		return scheduler.LockFunc(func(context.Context) error { return nil }), nil
 //	})
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
 //
-//	scheduler.NewJobBuilder(s).
+//	scheduler.New().
 //		WithoutOverlappingWithLocker(locker).
 //		EveryMinute().
 //		Do(func() {})
@@ -1043,7 +946,7 @@ func (j *JobBuilder) WithoutOverlappingWithLocker(locker gocron.Locker) *JobBuil
 //
 // Example: only register in production
 //
-//	scheduler.NewJobBuilder(nil).Environments("production").Daily()
+//	scheduler.New().Environments("production").Daily()
 func (j *JobBuilder) Environments(envs ...string) *JobBuilder {
 	j.envs = envs
 	return j
@@ -1055,9 +958,7 @@ func (j *JobBuilder) Environments(envs ...string) *JobBuilder {
 // Example: guard scheduling with a flag
 //
 //	flag := true
-//	scheduler.NewJobBuilder(nil).
-//		When(func() bool { return flag }).
-//		Daily()
+//	scheduler.New().When(func() bool { return flag }).Daily()
 func (j *JobBuilder) When(fn func() bool) *JobBuilder {
 	j.addWhen(fn)
 	return j
@@ -1069,9 +970,7 @@ func (j *JobBuilder) When(fn func() bool) *JobBuilder {
 // Example: suppress jobs based on a switch
 //
 //	enabled := false
-//	scheduler.NewJobBuilder(nil).
-//		Skip(func() bool { return !enabled }).
-//		Daily()
+//	scheduler.New().Skip(func() bool { return !enabled }).Daily()
 func (j *JobBuilder) Skip(fn func() bool) *JobBuilder {
 	j.addSkip(fn)
 	return j
@@ -1082,9 +981,7 @@ func (j *JobBuilder) Skip(fn func() bool) *JobBuilder {
 //
 // Example: label a job for logging
 //
-//	scheduler.NewJobBuilder(nil).
-//		Name("cache:refresh").
-//		HourlyAt(15)
+//	scheduler.New().Name("cache:refresh").HourlyAt(15)
 func (j *JobBuilder) Name(name string) *JobBuilder {
 	j.name = name
 	return j
@@ -1095,9 +992,7 @@ func (j *JobBuilder) Name(name string) *JobBuilder {
 //
 // Example: allow command jobs to run async
 //
-//	scheduler.NewJobBuilder(nil).
-//		RunInBackground().
-//		Command("noop")
+//	scheduler.New().RunInBackground().Command("noop")
 func (j *JobBuilder) RunInBackground() *JobBuilder {
 	j.runInBackground = true
 	return j
@@ -1108,9 +1003,7 @@ func (j *JobBuilder) RunInBackground() *JobBuilder {
 //
 // Example: add a before hook
 //
-//	scheduler.NewJobBuilder(nil).
-//		Before(func() { println("before") }).
-//		Daily()
+//	scheduler.New().Before(func() {}).Daily()
 func (j *JobBuilder) Before(fn func()) *JobBuilder {
 	j.hooks.Before = fn
 	return j
@@ -1121,9 +1014,7 @@ func (j *JobBuilder) Before(fn func()) *JobBuilder {
 //
 // Example: add an after hook
 //
-//	scheduler.NewJobBuilder(nil).
-//		After(func() { println("after") }).
-//		Daily()
+//	scheduler.New().After(func() {}).Daily()
 func (j *JobBuilder) After(fn func()) *JobBuilder {
 	j.hooks.After = fn
 	return j
@@ -1134,9 +1025,7 @@ func (j *JobBuilder) After(fn func()) *JobBuilder {
 //
 // Example: record success
 //
-//	scheduler.NewJobBuilder(nil).
-//		OnSuccess(func() { println("success") }).
-//		Daily()
+//	scheduler.New().OnSuccess(func() {}).Daily()
 func (j *JobBuilder) OnSuccess(fn func()) *JobBuilder {
 	j.hooks.OnSuccess = fn
 	return j
@@ -1147,9 +1036,7 @@ func (j *JobBuilder) OnSuccess(fn func()) *JobBuilder {
 //
 // Example: record failures
 //
-//	scheduler.NewJobBuilder(nil).
-//		OnFailure(func() { println("failure") }).
-//		Daily()
+//	scheduler.New().OnFailure(func() {}).Daily()
 func (j *JobBuilder) OnFailure(fn func()) *JobBuilder {
 	j.hooks.OnFailure = fn
 	return j
@@ -1188,7 +1075,7 @@ func (j *JobBuilder) addSkip(fn func() bool) {
 //
 // Example: weekday-only execution
 //
-//	scheduler.NewJobBuilder(nil).Weekdays().DailyAt("09:00")
+//	scheduler.New().Weekdays().DailyAt("09:00")
 func (j *JobBuilder) Weekdays() *JobBuilder {
 	j.addWhen(func() bool {
 		return isWeekday(j.now(), j.location())
@@ -1201,7 +1088,7 @@ func (j *JobBuilder) Weekdays() *JobBuilder {
 //
 // Example: weekend-only execution
 //
-//	scheduler.NewJobBuilder(nil).Weekends().DailyAt("10:00")
+//	scheduler.New().Weekends().DailyAt("10:00")
 func (j *JobBuilder) Weekends() *JobBuilder {
 	j.addWhen(func() bool {
 		return isWeekend(j.now(), j.location())
@@ -1214,7 +1101,7 @@ func (j *JobBuilder) Weekends() *JobBuilder {
 //
 // Example: run only on Sundays
 //
-//	scheduler.NewJobBuilder(nil).Sundays().DailyAt("09:00")
+//	scheduler.New().Sundays().DailyAt("09:00")
 func (j *JobBuilder) Sundays() *JobBuilder { return j.days(time.Sunday) }
 
 // Mondays limits the job to Mondays.
@@ -1222,7 +1109,7 @@ func (j *JobBuilder) Sundays() *JobBuilder { return j.days(time.Sunday) }
 //
 // Example: run only on Mondays
 //
-//	scheduler.NewJobBuilder(nil).Mondays().DailyAt("09:00")
+//	scheduler.New().Mondays().DailyAt("09:00")
 func (j *JobBuilder) Mondays() *JobBuilder { return j.days(time.Monday) }
 
 // Tuesdays limits the job to Tuesdays.
@@ -1230,7 +1117,7 @@ func (j *JobBuilder) Mondays() *JobBuilder { return j.days(time.Monday) }
 //
 // Example: run only on Tuesdays
 //
-//	scheduler.NewJobBuilder(nil).Tuesdays().DailyAt("09:00")
+//	scheduler.New().Tuesdays().DailyAt("09:00")
 func (j *JobBuilder) Tuesdays() *JobBuilder { return j.days(time.Tuesday) }
 
 // Wednesdays limits the job to Wednesdays.
@@ -1238,7 +1125,7 @@ func (j *JobBuilder) Tuesdays() *JobBuilder { return j.days(time.Tuesday) }
 //
 // Example: run only on Wednesdays
 //
-//	scheduler.NewJobBuilder(nil).Wednesdays().DailyAt("09:00")
+//	scheduler.New().Wednesdays().DailyAt("09:00")
 func (j *JobBuilder) Wednesdays() *JobBuilder { return j.days(time.Wednesday) }
 
 // Thursdays limits the job to Thursdays.
@@ -1246,7 +1133,7 @@ func (j *JobBuilder) Wednesdays() *JobBuilder { return j.days(time.Wednesday) }
 //
 // Example: run only on Thursdays
 //
-//	scheduler.NewJobBuilder(nil).Thursdays().DailyAt("09:00")
+//	scheduler.New().Thursdays().DailyAt("09:00")
 func (j *JobBuilder) Thursdays() *JobBuilder { return j.days(time.Thursday) }
 
 // Fridays limits the job to Fridays.
@@ -1254,7 +1141,7 @@ func (j *JobBuilder) Thursdays() *JobBuilder { return j.days(time.Thursday) }
 //
 // Example: run only on Fridays
 //
-//	scheduler.NewJobBuilder(nil).Fridays().DailyAt("09:00")
+//	scheduler.New().Fridays().DailyAt("09:00")
 func (j *JobBuilder) Fridays() *JobBuilder { return j.days(time.Friday) }
 
 // Saturdays limits the job to Saturdays.
@@ -1262,7 +1149,7 @@ func (j *JobBuilder) Fridays() *JobBuilder { return j.days(time.Friday) }
 //
 // Example: run only on Saturdays
 //
-//	scheduler.NewJobBuilder(nil).Saturdays().DailyAt("09:00")
+//	scheduler.New().Saturdays().DailyAt("09:00")
 func (j *JobBuilder) Saturdays() *JobBuilder { return j.days(time.Saturday) }
 
 // Days limits the job to a specific set of weekdays.
@@ -1270,9 +1157,7 @@ func (j *JobBuilder) Saturdays() *JobBuilder { return j.days(time.Saturday) }
 //
 // Example: pick custom weekdays
 //
-//	scheduler.NewJobBuilder(nil).
-//		Days(time.Monday, time.Wednesday, time.Friday).
-//		DailyAt("07:00")
+//	scheduler.New().Days(time.Monday, time.Wednesday, time.Friday).DailyAt("07:00")
 func (j *JobBuilder) Days(days ...time.Weekday) *JobBuilder {
 	set := make(map[time.Weekday]struct{}, len(days))
 	for _, d := range days {
@@ -1295,9 +1180,7 @@ func (j *JobBuilder) days(day time.Weekday) *JobBuilder {
 //
 // Example: allow execution during business hours
 //
-//	scheduler.NewJobBuilder(nil).
-//		Between("09:00", "17:00").
-//		EveryMinute()
+//	scheduler.New().Between("09:00", "17:00").EveryMinute()
 func (j *JobBuilder) Between(start, end string) *JobBuilder {
 	startH, startM, err := parseHourMinute(start)
 	if err != nil {
@@ -1322,9 +1205,7 @@ func (j *JobBuilder) Between(start, end string) *JobBuilder {
 //
 // Example: pause execution overnight
 //
-//	scheduler.NewJobBuilder(nil).
-//		UnlessBetween("22:00", "06:00").
-//		EveryMinute()
+//	scheduler.New().UnlessBetween("22:00", "06:00").EveryMinute()
 func (j *JobBuilder) UnlessBetween(start, end string) *JobBuilder {
 	startH, startM, err := parseHourMinute(start)
 	if err != nil {
@@ -1345,20 +1226,29 @@ func (j *JobBuilder) UnlessBetween(start, end string) *JobBuilder {
 }
 
 // Command executes the current binary with the given subcommand and variadic args.
+// It does not run arbitrary system executables; use Exec for that.
 // @group Commands
 //
 // Example: run a CLI subcommand on schedule
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	scheduler.NewJobBuilder(s).
-//		Cron("0 0 * * *").
-//		Command("jobs:purge", "--force")
+//	scheduler.New().Cron("0 0 * * *").Command("jobs:purge", "--force")
 func (j *JobBuilder) Command(subcommand string, args ...string) *JobBuilder {
-	j.name = subcommand
-	j.targetKind = jobTargetCommand
+	return j.scheduleExecTarget(subcommand, args, true, jobTargetCommand)
+}
+
+// Exec runs an external executable with variadic args.
+// @group Commands
+//
+// Example: run a system executable on schedule
+//
+//	scheduler.New().Cron("0 0 * * *").Exec("/usr/bin/env", "echo", "hello")
+func (j *JobBuilder) Exec(executable string, args ...string) *JobBuilder {
+	return j.scheduleExecTarget(executable, args, false, jobTargetExec)
+}
+
+func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []string, selfBinary bool, kind jobTargetKind) *JobBuilder {
+	j.name = commandOrExecutable
+	j.targetKind = kind
 	j.commandArgs = args
 	localHooks := j.hooks
 	bg := j.runInBackground
@@ -1376,20 +1266,24 @@ func (j *JobBuilder) Command(subcommand string, args ...string) *JobBuilder {
 			return
 		}
 
-		exe, err := os.Executable()
-		if err != nil {
-			fmt.Printf("Unable to determine executable path: %v\n", err)
-			return
+		exe := commandOrExecutable
+		if selfBinary {
+			self, err := os.Executable()
+			if err != nil {
+				fmt.Printf("Unable to determine executable path: %v\n", err)
+				return
+			}
+			exe = self
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second)
 		defer cancel()
 
-		cmdArgs := append([]string{subcommand}, args...)
+		cmdArgs := args
+		if selfBinary {
+			cmdArgs = append([]string{commandOrExecutable}, args...)
+		}
 		run := func() error {
-			if os.Getenv("SCHEDULER_TEST_NO_EXEC") != "1" {
-				return j.commandRunner.Run(ctx, exe, cmdArgs)
-			}
 			return j.commandRunner.Run(ctx, exe, cmdArgs)
 		}
 
@@ -1404,11 +1298,7 @@ func (j *JobBuilder) Command(subcommand string, args ...string) *JobBuilder {
 //
 // Example: inspect scheduled jobs
 //
-//	s, _ := gocron.NewScheduler()
-//	s.Start()
-//	defer s.Shutdown()
-//
-//	b := scheduler.NewJobBuilder(s).EverySecond().Do(func() {})
+//	b := scheduler.New().EverySecond().Do(func() {})
 //	for id, meta := range b.JobMetadata() {
 //		_ = id
 //		_ = meta.Name
@@ -1441,7 +1331,7 @@ func (j *JobBuilder) recordJob(job gocron.Job, task func()) {
 		Tags:         job.Tags(),
 	}
 
-	if kind == jobTargetCommand {
+	if kind == jobTargetCommand || kind == jobTargetExec {
 		meta.Command = buildCommandString(j.name, j.commandArgs)
 		if meta.Name == "" {
 			meta.Name = j.name
@@ -1673,6 +1563,11 @@ type LockFunc func(ctx context.Context) error
 
 // Unlock invokes the underlying function.
 // @group Adapters
+//
+// Example: invoke unlock on an adapted lock
+//
+//	lock := scheduler.LockFunc(func(context.Context) error { return nil })
+//	_ = lock.Unlock(context.Background())
 func (f LockFunc) Unlock(ctx context.Context) error {
 	return f(ctx)
 }

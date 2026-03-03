@@ -46,7 +46,7 @@ func TestWithCommandRunnerAndFailureHook(t *testing.T) {
 	runner := &stubRunner{err: fmt.Errorf("boom"), done: done}
 	var failureCalled bool
 
-	jb := NewJobBuilder(s).
+	jb := newJobBuilder(s).
 		WithCommandRunner(runner).
 		OnFailure(func() { failureCalled = true }).
 		Cron("0 0 * * *").

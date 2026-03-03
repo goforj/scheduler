@@ -17,7 +17,7 @@ func TestWithNowFuncAndName(t *testing.T) {
 	defer s.Shutdown()
 
 	fixed := time.Date(2025, time.January, 1, 10, 0, 0, 0, time.UTC)
-	jb := NewJobBuilder(s).WithNowFunc(func() time.Time { return fixed }).Name("custom")
+	jb := newJobBuilder(s).WithNowFunc(func() time.Time { return fixed }).Name("custom")
 	jb.EveryMinute().Do(func() {})
 
 	require.Equal(t, fixed, jb.now())
@@ -32,7 +32,7 @@ func TestRunInBackgroundCommand(t *testing.T) {
 	done := make(chan struct{})
 	runner := &stubRunner{done: done}
 
-	jb := NewJobBuilder(s).
+	jb := newJobBuilder(s).
 		RunInBackground().
 		WithCommandRunner(runner).
 		Cron("0 * * * *").
@@ -62,7 +62,7 @@ func TestExecCommandRunner(t *testing.T) {
 }
 
 func TestLocationFallback(t *testing.T) {
-	jb := NewJobBuilder(nil).Timezone("bad/zone")
+	jb := newJobBuilder(nil).Timezone("bad/zone")
 	require.Equal(t, time.Local, jb.location())
 }
 

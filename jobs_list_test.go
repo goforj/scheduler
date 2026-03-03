@@ -15,7 +15,7 @@ func TestGetJobsListUsesMetadata(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	jb := NewJobBuilder(s)
+	jb := newJobBuilder(s)
 
 	jb.Cron("0 * * * *").Command("hello:world", "weekly")
 	jb.Every(2).Minutes().Name("funcJob").Do(func() {})
@@ -49,6 +49,7 @@ func TestJobsListHelpers(t *testing.T) {
 
 	require.Contains(t, renderTarget("handler", jobTargetFunction, "name"), "handler")
 	require.Contains(t, renderTarget("", jobTargetCommand, "name"), "-")
+	require.Contains(t, renderTarget("echo hi", jobTargetExec, "name"), "echo hi")
 
 	require.Contains(t, renderNextRunWithWidth(time.Time{}, nil, 5), "-")
 	require.Contains(t, renderNextRunWithWidth(next, nil, 8), "in")
@@ -70,7 +71,7 @@ func TestPrintJobsList(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	jb := NewJobBuilder(s)
+	jb := newJobBuilder(s)
 
 	jb.EveryMinute().Command("hello:world")
 	jb.EveryTwoMinutes().Do(func() {})
@@ -100,7 +101,7 @@ func TestPrintJobsListEmpty(t *testing.T) {
 	defer func() { os.Stdout = stdout }()
 	os.Stdout = w
 
-	NewJobBuilder(nil).PrintJobsList()
+	newJobBuilder(nil).PrintJobsList()
 
 	require.NoError(t, w.Close())
 	outBytes, _ := io.ReadAll(r)
