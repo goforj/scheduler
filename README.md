@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/github/v/tag/goforj/scheduler?label=version&sort=semver" alt="Latest tag">
     <a href="https://codecov.io/gh/goforj/scheduler" ><img src="https://codecov.io/github/goforj/scheduler/graph/badge.svg?token=9KT46ZORP3"/></a>
 <!-- test-count:embed:start -->
-    <img src="https://img.shields.io/badge/tests-204-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-215-brightgreen" alt="Tests">
 <!-- test-count:embed:end -->
     <a href="https://goreportcard.com/report/github.com/goforj/scheduler"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler" alt="Go Report Card"></a>
 </p>
@@ -142,6 +142,7 @@ This guarantees all examples are valid, up-to-date, and remain functional as the
 | **Lifecycle** | [Shutdown](#shutdown) [Start](#start) [Stop](#stop) |
 | **Locking** | [NewCacheLocker](#newcachelocker) [NewRedisLocker](#newredislocker) |
 | **Metadata** | [JobMetadata](#jobmetadata) [Name](#name) |
+| **Runtime control** | [IsJobPaused](#isjobpaused) [IsPausedAll](#ispausedall) [Observe](#observe) [PauseAll](#pauseall) [PauseJob](#pausejob) [ResumeAll](#resumeall) [ResumeJob](#resumejob) |
 | **State management** | [RetainState](#retainstate) |
 | **Triggers** | [Cron](#cron) [Do](#do) |
 
@@ -942,6 +943,69 @@ Name sets an explicit job name.
 
 ```go
 scheduler.New().Name("cache:refresh").HourlyAt(15)
+```
+
+## Runtime control
+
+### <a id="isjobpaused"></a>IsJobPaused
+
+IsJobPaused reports whether a specific job is paused.
+
+### <a id="ispausedall"></a>IsPausedAll
+
+IsPausedAll reports whether global pause is enabled.
+
+### <a id="observe"></a>Observe
+
+Observe registers a lifecycle observer for all scheduled jobs.
+Events are emitted consistently across Do, Command, and Exec jobs.
+
+```go
+s := scheduler.New()
+s.Observe(scheduler.JobObserverFunc(func(event scheduler.JobEvent) {
+	if event.Type == scheduler.JobSkipped && event.Reason == "paused" {
+		fmt.Println("skipped: paused")
+	}
+}))
+```
+
+### <a id="pauseall"></a>PauseAll
+
+PauseAll pauses execution for all scheduled jobs without removing them.
+This is universal across Do, Command, and Exec jobs.
+
+```go
+s := scheduler.New()
+_ = s.PauseAll()
+```
+
+### <a id="pausejob"></a>PauseJob
+
+PauseJob pauses execution for a specific scheduled job.
+
+```go
+s := scheduler.New()
+b := s.EverySecond().Name("heartbeat").Do(func() {})
+_ = s.PauseJob(b.Job().ID())
+```
+
+### <a id="resumeall"></a>ResumeAll
+
+ResumeAll resumes execution for all paused jobs.
+
+```go
+s := scheduler.New()
+_ = s.ResumeAll()
+```
+
+### <a id="resumejob"></a>ResumeJob
+
+ResumeJob resumes a paused job by ID.
+
+```go
+s := scheduler.New()
+b := s.EverySecond().Name("heartbeat").Do(func() {})
+_ = s.ResumeJob(b.Job().ID())
 ```
 
 ## State management
