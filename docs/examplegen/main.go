@@ -368,10 +368,6 @@ func writeMain(base string, fd *FuncDoc, importPath string) error {
 
 	var buf bytes.Buffer
 
-	// Build tag
-	buf.WriteString("//go:build ignore\n")
-	buf.WriteString("// +build ignore\n\n")
-
 	buf.WriteString("package main\n\n")
 
 	imports := map[string]bool{
@@ -471,5 +467,14 @@ func writeMain(base string, fd *FuncDoc, importPath string) error {
 
 	buf.WriteString("}\n")
 
-	return os.WriteFile(filepath.Join(dir, "main.go"), buf.Bytes(), 0o644)
+	if err := os.WriteFile(filepath.Join(dir, "main.go"), buf.Bytes(), 0o644); err != nil {
+		return err
+	}
+
+	legacyDepsPath := filepath.Join(dir, "deps_test.go")
+	if fileExists(legacyDepsPath) {
+		return os.Remove(legacyDepsPath)
+	}
+
+	return nil
 }
