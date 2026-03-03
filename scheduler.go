@@ -47,8 +47,9 @@ func NewWithError(options ...gocron.SchedulerOption) (*Scheduler, error) {
 		return nil, err
 	}
 	s.Start()
+	state := newRuntimeState()
 	return &Scheduler{
-		JobBuilder: newJobBuilder(s),
+		JobBuilder: newJobBuilderWithState(s, state),
 		s:          s,
 	}, nil
 }
@@ -95,18 +96,18 @@ func (s *Scheduler) Jobs() []gocron.Job {
 // Every starts an interval chain identical to JobBuilder.Every.
 // @group Intervals
 func (s *Scheduler) Every(interval int) *FluentEvery {
-	return newJobBuilder(s.s).Every(interval)
+	return newJobBuilderWithState(s.s, s.JobBuilder.state).Every(interval)
 }
 
 // EveryDuration schedules a duration-based interval job builder.
 // @group Intervals
 func (s *Scheduler) EveryDuration(interval time.Duration) *JobBuilder {
-	return newJobBuilder(s.s).every(interval)
+	return newJobBuilderWithState(s.s, s.JobBuilder.state).every(interval)
 }
 
 // Cron schedules a cron-based job builder.
 func (s *Scheduler) Cron(expr string) *JobBuilder {
-	return newJobBuilder(s.s).Cron(expr)
+	return newJobBuilderWithState(s.s, s.JobBuilder.state).Cron(expr)
 }
 
 // GocronScheduler returns the underlying gocron scheduler for advanced integration.

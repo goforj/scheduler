@@ -84,6 +84,7 @@ func (execCommandRunner) Run(ctx context.Context, exe string, args []string) err
 // JobBuilder is a wrapper around gocron.Job that provides a fluent interface for scheduling jobs.
 type JobBuilder struct {
 	scheduler         SchedulerAdapter
+	state             *runtimeState
 	timezone          string
 	name              string
 	err               error
@@ -97,7 +98,6 @@ type JobBuilder struct {
 	whenFunc          func() bool
 	skipFunc          func() bool
 	extraTags         []string
-	jobMetadata       map[uuid.UUID]JobMetadata
 	targetKind        jobTargetKind
 	commandArgs       []string
 	commandRunner     CommandRunner
@@ -114,9 +114,16 @@ type taskHooks struct {
 }
 
 func newJobBuilder(s SchedulerAdapter) *JobBuilder {
+	return newJobBuilderWithState(s, nil)
+}
+
+func newJobBuilderWithState(s SchedulerAdapter, state *runtimeState) *JobBuilder {
+	if state == nil {
+		state = newRuntimeState()
+	}
 	return &JobBuilder{
 		scheduler:     s,
-		jobMetadata:   make(map[uuid.UUID]JobMetadata),
+		state:         state,
 		targetKind:    jobTargetFunction,
 		commandRunner: execCommandRunner{},
 		now:           nowFunc,
@@ -204,17 +211,19 @@ func (j *JobBuilder) buildTags(jobName string) []string {
 //
 //	scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func() {})
 func (j *JobBuilder) Do(task func()) *JobBuilder {
+	return j.doWithRunner(task, func() error {
+		task()
+		return nil
+	})
+}
+
+func (j *JobBuilder) doWithRunner(task func(), run func() error) *JobBuilder {
 	if j.err != nil {
 		return j
 	}
 
 	localHooks := j.hooks
 	bg := j.runInBackground
-
-	taskToRun := task
-	if j.targetKind == jobTargetFunction {
-		taskToRun = j.taskWithHooks(task, localHooks, bg)
-	}
 
 	if j.targetKind == "" {
 		j.targetKind = jobTargetFunction
@@ -263,6 +272,11 @@ func (j *JobBuilder) Do(task func()) *JobBuilder {
 		opts = append(opts, gocron.WithTags(tags...))
 	}
 
+	var jobID uuid.UUID
+	taskToRun := func() {
+		j.executeRun(jobID, run, localHooks, bg)
+	}
+
 	var job gocron.Job
 	if j.cronExpr != "" {
 		expr := j.cronExpr
@@ -293,6 +307,7 @@ func (j *JobBuilder) Do(task func()) *JobBuilder {
 		return j
 	}
 
+	jobID = job.ID()
 	j.lastJob = job
 	j.recordJob(job, task)
 
@@ -1249,8 +1264,6 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 	j.name = commandOrExecutable
 	j.targetKind = kind
 	j.commandArgs = args
-	localHooks := j.hooks
-	bg := j.runInBackground
 
 	// turn CLI args into tags
 	if len(args) > 0 {
@@ -1259,18 +1272,17 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 		j.extraTags = []string{fmt.Sprintf("args=\"%s\"", joined)}
 	}
 
-	task := func() {
+	task := func() {}
+	run := func() error {
 		if j.err != nil {
-			fmt.Printf("❌ Error scheduling command: %v\n", j.err)
-			return
+			return j.err
 		}
 
 		exe := commandOrExecutable
 		if selfBinary {
 			self, err := os.Executable()
 			if err != nil {
-				fmt.Printf("Unable to determine executable path: %v\n", err)
-				return
+				return fmt.Errorf("unable to determine executable path: %w", err)
 			}
 			exe = self
 		}
@@ -1282,14 +1294,111 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 		if selfBinary {
 			cmdArgs = append([]string{commandOrExecutable}, args...)
 		}
-		run := func() error {
-			return j.commandRunner.Run(ctx, exe, cmdArgs)
-		}
-
-		j.runWithHooks(run, localHooks, bg)
+		return j.commandRunner.Run(ctx, exe, cmdArgs)
 	}
 
-	return j.Do(task)
+	return j.doWithRunner(task, run)
+}
+
+// PauseAll pauses execution for all scheduled jobs without removing them.
+// This is universal across Do, Command, and Exec jobs.
+// @group Runtime control
+//
+// Example: pause all jobs
+//
+//	s := scheduler.New()
+//	_ = s.PauseAll()
+func (j *JobBuilder) PauseAll() error {
+	if j.state == nil {
+		j.state = newRuntimeState()
+	}
+	j.state.pauseAll()
+	return nil
+}
+
+// ResumeAll resumes execution for all paused jobs.
+// @group Runtime control
+//
+// Example: resume all jobs
+//
+//	s := scheduler.New()
+//	_ = s.ResumeAll()
+func (j *JobBuilder) ResumeAll() error {
+	if j.state == nil {
+		j.state = newRuntimeState()
+	}
+	j.state.resumeAll()
+	return nil
+}
+
+// PauseJob pauses execution for a specific scheduled job.
+// @group Runtime control
+//
+// Example: pause one job by ID
+//
+//	s := scheduler.New()
+//	b := s.EverySecond().Name("heartbeat").Do(func() {})
+//	_ = s.PauseJob(b.Job().ID())
+func (j *JobBuilder) PauseJob(id uuid.UUID) error {
+	if j.state == nil {
+		j.state = newRuntimeState()
+	}
+	j.state.pauseJob(id)
+	return nil
+}
+
+// ResumeJob resumes a paused job by ID.
+// @group Runtime control
+//
+// Example: resume one job by ID
+//
+//	s := scheduler.New()
+//	b := s.EverySecond().Name("heartbeat").Do(func() {})
+//	_ = s.ResumeJob(b.Job().ID())
+func (j *JobBuilder) ResumeJob(id uuid.UUID) error {
+	if j.state == nil {
+		j.state = newRuntimeState()
+	}
+	j.state.resumeJob(id)
+	return nil
+}
+
+// IsPausedAll reports whether global pause is enabled.
+// @group Runtime control
+func (j *JobBuilder) IsPausedAll() bool {
+	if j.state == nil {
+		return false
+	}
+	return j.state.isPausedAll()
+}
+
+// IsJobPaused reports whether a specific job is paused.
+// @group Runtime control
+func (j *JobBuilder) IsJobPaused(id uuid.UUID) bool {
+	if j.state == nil {
+		return false
+	}
+	return j.state.isJobPaused(id)
+}
+
+// Observe registers a lifecycle observer for all scheduled jobs.
+// Events are emitted consistently across Do, Command, and Exec jobs.
+// @group Runtime control
+//
+// Example: observe paused-skip events
+//
+//	s := scheduler.New()
+//	s.Observe(scheduler.JobObserverFunc(func(event scheduler.JobEvent) {
+//		if event.Type == scheduler.JobSkipped && event.Reason == "paused" {
+//			fmt.Println("skipped: paused")
+//		}
+//	}))
+func (j *JobBuilder) Observe(observer JobObserver) *JobBuilder {
+	if j.state == nil {
+		j.state = newRuntimeState()
+	}
+	j.state.addObserver(observer)
+	return j
 }
 
 // JobMetadata returns a copy of the tracked job metadata keyed by job ID.
@@ -1303,16 +1412,15 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 //		_ = meta.Name
 //	}
 func (j *JobBuilder) JobMetadata() map[uuid.UUID]JobMetadata {
-	out := make(map[uuid.UUID]JobMetadata, len(j.jobMetadata))
-	for id, meta := range j.jobMetadata {
-		out[id] = meta
+	if j.state == nil {
+		return map[uuid.UUID]JobMetadata{}
 	}
-	return out
+	return j.state.metadataCopy()
 }
 
 func (j *JobBuilder) recordJob(job gocron.Job, task func()) {
-	if j.jobMetadata == nil {
-		j.jobMetadata = make(map[uuid.UUID]JobMetadata)
+	if j.state == nil {
+		j.state = newRuntimeState()
 	}
 
 	scheduleType, schedule := j.describeSchedule()
@@ -1342,7 +1450,7 @@ func (j *JobBuilder) recordJob(job gocron.Job, task func()) {
 		}
 	}
 
-	j.jobMetadata[meta.ID] = meta
+	j.state.setMetadata(meta)
 }
 
 func (j *JobBuilder) describeSchedule() (jobScheduleKind, string) {
@@ -1439,22 +1547,78 @@ func (j *JobBuilder) location() *time.Location {
 	return loc
 }
 
-func (j *JobBuilder) runWithHooks(run func() error, hooks taskHooks, bg bool) {
-	if hooks.Before != nil {
-		hooks.Before()
-	}
-
+func (j *JobBuilder) executeRun(jobID uuid.UUID, run func() error, hooks taskHooks, bg bool) {
 	execFn := func() {
+		if j.state != nil && j.state.isExecutionPaused(jobID) {
+			meta := j.JobMetadata()[jobID]
+			j.state.emit(JobEvent{
+				Type:       JobSkipped,
+				JobID:      jobID,
+				Name:       meta.Name,
+				TargetKind: meta.TargetKind,
+				Reason:     string(JobSkipPaused),
+				OccurredAt: time.Now(),
+			})
+			return
+		}
+
+		meta := j.JobMetadata()[jobID]
+		attempt := 1
+		if j.state != nil {
+			attempt = j.state.nextAttempt(jobID)
+		}
+
+		start := time.Now()
+		if j.state != nil {
+			j.state.emit(JobEvent{
+				Type:       JobStarted,
+				JobID:      jobID,
+				Name:       meta.Name,
+				TargetKind: meta.TargetKind,
+				Attempt:    attempt,
+				OccurredAt: start,
+			})
+		}
+
+		if hooks.Before != nil {
+			hooks.Before()
+		}
+
 		err := run()
+		duration := time.Since(start)
 		if err != nil {
 			if hooks.OnFailure != nil {
 				hooks.OnFailure()
+			}
+			if j.state != nil {
+				j.state.emit(JobEvent{
+					Type:       JobFailed,
+					JobID:      jobID,
+					Name:       meta.Name,
+					TargetKind: meta.TargetKind,
+					Attempt:    attempt,
+					Duration:   duration,
+					Error:      err,
+					OccurredAt: time.Now(),
+				})
 			}
 		} else {
 			if hooks.OnSuccess != nil {
 				hooks.OnSuccess()
 			}
+			if j.state != nil {
+				j.state.emit(JobEvent{
+					Type:       JobSucceeded,
+					JobID:      jobID,
+					Name:       meta.Name,
+					TargetKind: meta.TargetKind,
+					Attempt:    attempt,
+					Duration:   duration,
+					OccurredAt: time.Now(),
+				})
+			}
 		}
+
 		if hooks.After != nil {
 			hooks.After()
 		}
@@ -1465,15 +1629,6 @@ func (j *JobBuilder) runWithHooks(run func() error, hooks taskHooks, bg bool) {
 		return
 	}
 	execFn()
-}
-
-func (j *JobBuilder) taskWithHooks(fn func(), hooks taskHooks, bg bool) func() {
-	return func() {
-		j.runWithHooks(func() error {
-			fn()
-			return nil
-		}, hooks, bg)
-	}
 }
 
 func isWeekday(t time.Time, loc *time.Location) bool {
