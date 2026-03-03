@@ -37,7 +37,7 @@ Everything remains explicit, testable, and inspectable, while staying pleasant t
 
 ## Quick Start
 
-Basic:
+### Basic
 
 ```go
 s := scheduler.New()
@@ -51,7 +51,7 @@ s.EveryFiveMinutes().WithoutOverlapping().Name("sync:inventory").Do(func() { syn
 s.Cron("0 * * * *").When(func() bool { return isPrimaryNode() }).Name("rebalance").Do(func() { rebalance() }) // run only when condition passes
 ```
 
-Advanced (kitchen sink):
+### Advanced (kitchen sink)
 
 ```go
 s := scheduler.New()
