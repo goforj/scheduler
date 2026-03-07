@@ -5,8 +5,8 @@ go 1.24.4
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-co-op/gocron/v2 v2.19.0
-	github.com/goforj/cache v0.1.3
-	github.com/goforj/cache/driver/rediscache v0.1.4
+	github.com/goforj/cache v0.1.5
+	github.com/goforj/cache/driver/rediscache v0.1.5
 	github.com/google/uuid v1.6.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/redis/go-redis/v9 v9.17.2
@@ -22,8 +22,8 @@ require (
 	github.com/charmbracelet/x/term v0.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/goforj/cache/cachecore v0.1.3 // indirect
-	github.com/goforj/cache/cachetest v0.1.3 // indirect
+	github.com/goforj/cache/cachecore v0.1.5 // indirect
+	github.com/goforj/cache/cachetest v0.1.5 // indirect
 	github.com/kr/pretty v0.3.1 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

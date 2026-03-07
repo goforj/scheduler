@@ -1783,7 +1783,7 @@ func NewCacheLocker(client cache.LockAPI, ttl time.Duration) *CacheLocker {
 // Lock obtains a lock for the job name using the cache lock API.
 // @group Locking
 func (l *CacheLocker) Lock(ctx context.Context, key string) (gocron.Lock, error) {
-	locked, err := l.client.TryLockCtx(ctx, l.lockKey(key), l.ttl)
+	locked, err := l.client.TryLockContext(ctx, l.lockKey(key), l.ttl)
 	if err != nil {
 		return nil, err
 	}
@@ -1861,7 +1861,7 @@ type cacheLock struct {
 }
 
 func (l *cacheLock) Unlock(ctx context.Context) error {
-	return l.client.UnlockCtx(ctx, l.key)
+	return l.client.UnlockContext(ctx, l.key)
 }
 
 // Unlock releases the redis-backed lock.

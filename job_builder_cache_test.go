@@ -20,7 +20,7 @@ func (m *mockCacheLockClient) TryLock(key string, ttl time.Duration) (bool, erro
 	return m.tryLockResult, m.tryLockErr
 }
 
-func (m *mockCacheLockClient) TryLockCtx(ctx context.Context, key string, ttl time.Duration) (bool, error) {
+func (m *mockCacheLockClient) TryLockContext(ctx context.Context, key string, ttl time.Duration) (bool, error) {
 	return m.tryLockResult, m.tryLockErr
 }
 
@@ -28,7 +28,7 @@ func (m *mockCacheLockClient) Lock(key string, ttl, timeout time.Duration) (bool
 	return m.tryLockResult, m.tryLockErr
 }
 
-func (m *mockCacheLockClient) LockCtx(ctx context.Context, key string, ttl, retryInterval time.Duration) (bool, error) {
+func (m *mockCacheLockClient) LockContext(ctx context.Context, key string, ttl, retryInterval time.Duration) (bool, error) {
 	return m.tryLockResult, m.tryLockErr
 }
 
@@ -37,7 +37,7 @@ func (m *mockCacheLockClient) Unlock(key string) error {
 	return m.unlockErr
 }
 
-func (m *mockCacheLockClient) UnlockCtx(ctx context.Context, key string) error {
+func (m *mockCacheLockClient) UnlockContext(ctx context.Context, key string) error {
 	m.unlockCalls++
 	return m.unlockErr
 }
