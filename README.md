@@ -35,6 +35,25 @@ Go has excellent low-level scheduling libraries, but defining real-world schedul
 
 Everything remains explicit, testable, and inspectable, while staying pleasant to read and maintain.
 
+## Installation
+
+```bash
+go get github.com/goforj/scheduler
+```
+
+If you use distributed locking, there are two paths:
+
+- Bring your own `gocron.Locker` implementation and install whatever backend client it needs.
+- Use `NewCacheLocker` with `github.com/goforj/cache` and install only the cache driver you plan to use.
+
+For example, with a cache-backed Redis locker:
+
+```bash
+go get github.com/goforj/cache
+go get github.com/goforj/cache/driver/rediscache
+go get github.com/redis/go-redis/v9
+```
+
 ## Quick Start
 
 ### Basic
