@@ -1532,8 +1532,8 @@ func friendlyFuncName(fn any) string {
 	segments := strings.Split(name, ".")
 	if len(segments) >= 3 {
 		n := len(segments)
-		typePart := segments[n-3]
-		method := segments[n-2]
+		typePart := segments[n-2]
+		method := segments[n-1]
 		anonSuffix := ""
 		if anon {
 			anonSuffix = " (anon func)"

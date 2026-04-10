@@ -350,9 +350,9 @@ func TestFriendlyFuncNameVariants(t *testing.T) {
 	require.Contains(t, friendlyFuncName(fn), "anon func")
 
 	f := testFoo{}
-	require.Contains(t, friendlyFuncName(f.sample), "testFoo")
-	require.NotEmpty(t, friendlyFuncName((&testFoo{}).sample))
-	require.Contains(t, friendlyFuncName((&testFoo{}).ptrSample), "testFoo")
+	require.Contains(t, friendlyFuncName(f.sample), "testFoo.sample")
+	require.Contains(t, friendlyFuncName((&testFoo{}).sample), "testFoo.sample")
+	require.Contains(t, friendlyFuncName((&testFoo{}).ptrSample), "testFoo.ptrSample")
 }
 
 func TestBuildCommandString(t *testing.T) {

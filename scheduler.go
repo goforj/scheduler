@@ -113,7 +113,3 @@ func (s *Scheduler) Cron(expr string) *JobBuilder {
 func (s *Scheduler) GocronScheduler() gocron.Scheduler {
 	return s.s
 }
-
-func (s *Scheduler) Raw() gocron.Scheduler {
-	return s.GocronScheduler()
-}
