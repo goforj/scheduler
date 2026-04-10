@@ -18,7 +18,7 @@ func TestWithNowFuncAndName(t *testing.T) {
 
 	fixed := time.Date(2025, time.January, 1, 10, 0, 0, 0, time.UTC)
 	jb := newJobBuilder(s).WithNowFunc(func() time.Time { return fixed }).Name("custom")
-	jb.EveryMinute().Do(func() {})
+	jb.EveryMinute().Do(func(context.Context) error { return nil })
 
 	require.Equal(t, fixed, jb.now())
 	require.Equal(t, "custom", jb.Job().Name())

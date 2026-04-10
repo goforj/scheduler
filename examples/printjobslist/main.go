@@ -1,6 +1,9 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// PrintJobsList renders and prints the scheduler job table to stdout.
@@ -8,7 +11,7 @@ func main() {
 	// Example: print current jobs
 	s := scheduler.New()
 	defer s.Stop()
-	s.EverySecond().Name("heartbeat").Do(func() {})
+	s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 	s.PrintJobsList()
 	// Output:
 	// +------------------------------------------------------------------------------------------+

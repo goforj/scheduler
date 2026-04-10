@@ -1,10 +1,13 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// OnSuccess sets a hook to run after successful task execution.
 
 	// Example: record success
-	scheduler.New().OnSuccess(func() {}).Daily()
+	scheduler.New().OnSuccess(func(context.Context) {}).Daily()
 }

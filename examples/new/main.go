@@ -1,6 +1,9 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// New creates and starts a scheduler facade.
@@ -9,5 +12,5 @@ func main() {
 	// Example: create scheduler and run a simple interval job
 	s := scheduler.New()
 	defer s.Stop()
-	s.Every(15).Seconds().Do(func() {})
+	s.Every(15).Seconds().Do(func(context.Context) error { return nil })
 }

@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/github/v/tag/goforj/scheduler?label=version&sort=semver" alt="Latest tag">
     <a href="https://codecov.io/gh/goforj/scheduler" ><img src="https://codecov.io/github/goforj/scheduler/graph/badge.svg?token=9KT46ZORP3"/></a>
 <!-- test-count:embed:start -->
-    <img src="https://img.shields.io/badge/tests-218-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-219-brightgreen" alt="Tests">
 <!-- test-count:embed:end -->
     <a href="https://goreportcard.com/report/github.com/goforj/scheduler"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler" alt="Go Report Card"></a>
 </p>
@@ -62,12 +62,12 @@ go get github.com/redis/go-redis/v9
 s := scheduler.New()
 defer s.Stop()
 
-s.EveryMinute().Name("cleanup").Do(func() { runCleanup() }) // run in-process cleanup every minute
-s.DailyAt("09:00").Weekdays().Name("reports:morning").Do(func() { sendMorningReport() }) // weekdays at 09:00
+s.EveryMinute().Name("cleanup").Do(func(context.Context) error { return runCleanup() }) // run in-process cleanup every minute
+s.DailyAt("09:00").Weekdays().Name("reports:morning").Do(func(context.Context) error { return sendMorningReport() }) // weekdays at 09:00
 s.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly
 s.Cron("*/15 * * * *").Exec("/usr/bin/env", "echo", "heartbeat") // run external executable every 15 minutes
-s.EveryFiveMinutes().WithoutOverlapping().Name("sync:inventory").Do(func() { syncInventory() }) // prevent overlapping runs
-s.Cron("0 * * * *").When(func() bool { return isPrimaryNode() }).Name("rebalance").Do(func() { rebalance() }) // run only when condition passes
+s.EveryFiveMinutes().WithoutOverlapping().Name("sync:inventory").Do(func(context.Context) error { return syncInventory() }) // prevent overlapping runs
+s.Cron("0 * * * *").When(func() bool { return isPrimaryNode() }).Name("rebalance").Do(func(context.Context) error { return rebalance() }) // run only when condition passes
 ```
 
 ### Advanced (kitchen sink)
@@ -82,11 +82,11 @@ s.
 	Weekdays().
 	Between("09:00", "17:00").
 	WithoutOverlapping().
-	Before(func() { markJobStart("reports:generate") }).
-	OnSuccess(func() { notifySuccess("reports:generate") }).
-	OnFailure(func() { notifyFailure("reports:generate") }).
+	Before(func(context.Context) { markJobStart("reports:generate") }).
+	OnSuccess(func(context.Context) { notifySuccess("reports:generate") }).
+	OnFailure(func(_ context.Context, err error) { notifyFailure("reports:generate", err) }).
 	DailyAt("10:30").
-	Do(func() { generateReports() })
+	Do(func(context.Context) error { return generateReports() })
 
 s.
 	Name("reconcile:daily").
@@ -101,6 +101,7 @@ s.
 package main
 
 import (
+	"context"
 	"github.com/goforj/scheduler"
 )
 
@@ -108,8 +109,8 @@ func main() {
 	s := scheduler.New()
 	defer s.Stop()
 
-	s.EveryMinute().Name("cleanup").Do(func() {}) // run cleanup every minute
-	s.DailyAt("10:30").Weekdays().Name("reports:generate").Do(func() {}) // run reports on weekdays at 10:30
+	s.EveryMinute().Name("cleanup").Do(func(context.Context) error { return nil }) // run cleanup every minute
+	s.DailyAt("10:30").Weekdays().Name("reports:generate").Do(func(context.Context) error { return nil }) // run reports on weekdays at 10:30
 	s.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly at midnight
 
 	s.PrintJobsList()
@@ -351,7 +352,7 @@ WithoutOverlapping ensures the job does not run concurrently.
 scheduler.New().
 	WithoutOverlapping().
 	EveryFiveSeconds().
-	Do(func() { time.Sleep(7 * time.Second) })
+	Do(func(context.Context) error { time.Sleep(7 * time.Second); return nil })
 ```
 
 ### <a id="withoutoverlappingwithlocker"></a>WithoutOverlappingWithLocker
@@ -366,7 +367,7 @@ locker := scheduler.LockerFunc(func(ctx context.Context, key string) (gocron.Loc
 scheduler.New().
 	WithoutOverlappingWithLocker(locker).
 	EveryMinute().
-	Do(func() {})
+	Do(func(context.Context) error { return nil })
 ```
 
 ## Configuration
@@ -413,7 +414,7 @@ It panics only if gocron scheduler construction fails.
 ```go
 s := scheduler.New()
 defer s.Stop()
-s.Every(15).Seconds().Do(func() {})
+s.Every(15).Seconds().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="newwitherror"></a>NewWithError
@@ -455,7 +456,7 @@ fmt.Println(builder.Error())
 Job returns the last scheduled gocron.Job instance, if available.
 
 ```go
-b := scheduler.New().EverySecond().Do(func() {})
+b := scheduler.New().EverySecond().Do(func(context.Context) error { return nil })
 fmt.Println(b.Job() != nil)
 // Output: true
 ```
@@ -471,7 +472,7 @@ PrintJobsList renders and prints the scheduler job table to stdout.
 ```go
 s := scheduler.New()
 defer s.Stop()
-s.EverySecond().Name("heartbeat").Do(func() {})
+s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 s.PrintJobsList()
 // Output:
 // +------------------------------------------------------------------------------------------+
@@ -624,7 +625,7 @@ scheduler.New().When(func() bool { return flag }).Daily()
 After sets a hook to run after task execution.
 
 ```go
-scheduler.New().After(func() {}).Daily()
+scheduler.New().After(func(context.Context) {}).Daily()
 ```
 
 ### <a id="before"></a>Before
@@ -632,7 +633,7 @@ scheduler.New().After(func() {}).Daily()
 Before sets a hook to run before task execution.
 
 ```go
-scheduler.New().Before(func() {}).Daily()
+scheduler.New().Before(func(context.Context) {}).Daily()
 ```
 
 ### <a id="onfailure"></a>OnFailure
@@ -640,7 +641,7 @@ scheduler.New().Before(func() {}).Daily()
 OnFailure sets a hook to run after failed task execution.
 
 ```go
-scheduler.New().OnFailure(func() {}).Daily()
+scheduler.New().OnFailure(func(context.Context, error) {}).Daily()
 ```
 
 ### <a id="onsuccess"></a>OnSuccess
@@ -648,7 +649,7 @@ scheduler.New().OnFailure(func() {}).Daily()
 OnSuccess sets a hook to run after successful task execution.
 
 ```go
-scheduler.New().OnSuccess(func() {}).Daily()
+scheduler.New().OnSuccess(func(context.Context) {}).Daily()
 ```
 
 ## Interop
@@ -677,7 +678,7 @@ EveryDuration schedules a duration-based interval job builder.
 EveryFifteenMinutes schedules the job to run every 15 minutes.
 
 ```go
-scheduler.New().EveryFifteenMinutes().Do(func() {})
+scheduler.New().EveryFifteenMinutes().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everyfifteenseconds"></a>EveryFifteenSeconds
@@ -685,7 +686,7 @@ scheduler.New().EveryFifteenMinutes().Do(func() {})
 EveryFifteenSeconds schedules the job to run every 15 seconds.
 
 ```go
-scheduler.New().EveryFifteenSeconds().Do(func() {})
+scheduler.New().EveryFifteenSeconds().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everyfiveminutes"></a>EveryFiveMinutes
@@ -693,7 +694,7 @@ scheduler.New().EveryFifteenSeconds().Do(func() {})
 EveryFiveMinutes schedules the job to run every 5 minutes.
 
 ```go
-scheduler.New().EveryFiveMinutes().Do(func() {})
+scheduler.New().EveryFiveMinutes().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everyfiveseconds"></a>EveryFiveSeconds
@@ -701,7 +702,7 @@ scheduler.New().EveryFiveMinutes().Do(func() {})
 EveryFiveSeconds schedules the job to run every 5 seconds.
 
 ```go
-scheduler.New().EveryFiveSeconds().Do(func() {})
+scheduler.New().EveryFiveSeconds().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everyfourhours"></a>EveryFourHours
@@ -717,7 +718,7 @@ scheduler.New().EveryFourHours(25)
 EveryFourMinutes schedules the job to run every 4 minutes.
 
 ```go
-scheduler.New().EveryFourMinutes().Do(func() {})
+scheduler.New().EveryFourMinutes().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everyminute"></a>EveryMinute
@@ -725,7 +726,7 @@ scheduler.New().EveryFourMinutes().Do(func() {})
 EveryMinute schedules the job to run every 1 minute.
 
 ```go
-scheduler.New().EveryMinute().Do(func() {})
+scheduler.New().EveryMinute().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everyoddhour"></a>EveryOddHour
@@ -741,7 +742,7 @@ scheduler.New().EveryOddHour(10)
 EverySecond schedules the job to run every 1 second.
 
 ```go
-scheduler.New().EverySecond().Do(func() {})
+scheduler.New().EverySecond().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everysixhours"></a>EverySixHours
@@ -757,7 +758,7 @@ scheduler.New().EverySixHours(30)
 EveryTenMinutes schedules the job to run every 10 minutes.
 
 ```go
-scheduler.New().EveryTenMinutes().Do(func() {})
+scheduler.New().EveryTenMinutes().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everytenseconds"></a>EveryTenSeconds
@@ -765,7 +766,7 @@ scheduler.New().EveryTenMinutes().Do(func() {})
 EveryTenSeconds schedules the job to run every 10 seconds.
 
 ```go
-scheduler.New().EveryTenSeconds().Do(func() {})
+scheduler.New().EveryTenSeconds().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everythirtyminutes"></a>EveryThirtyMinutes
@@ -773,7 +774,7 @@ scheduler.New().EveryTenSeconds().Do(func() {})
 EveryThirtyMinutes schedules the job to run every 30 minutes.
 
 ```go
-scheduler.New().EveryThirtyMinutes().Do(func() {})
+scheduler.New().EveryThirtyMinutes().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everythirtyseconds"></a>EveryThirtySeconds
@@ -781,7 +782,7 @@ scheduler.New().EveryThirtyMinutes().Do(func() {})
 EveryThirtySeconds schedules the job to run every 30 seconds.
 
 ```go
-scheduler.New().EveryThirtySeconds().Do(func() {})
+scheduler.New().EveryThirtySeconds().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everythreehours"></a>EveryThreeHours
@@ -797,7 +798,7 @@ scheduler.New().EveryThreeHours(20)
 EveryThreeMinutes schedules the job to run every 3 minutes.
 
 ```go
-scheduler.New().EveryThreeMinutes().Do(func() {})
+scheduler.New().EveryThreeMinutes().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everytwentyseconds"></a>EveryTwentySeconds
@@ -805,7 +806,7 @@ scheduler.New().EveryThreeMinutes().Do(func() {})
 EveryTwentySeconds schedules the job to run every 20 seconds.
 
 ```go
-scheduler.New().EveryTwentySeconds().Do(func() {})
+scheduler.New().EveryTwentySeconds().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everytwohours"></a>EveryTwoHours
@@ -821,7 +822,7 @@ scheduler.New().EveryTwoHours(15)
 EveryTwoMinutes schedules the job to run every 2 minutes.
 
 ```go
-scheduler.New().EveryTwoMinutes().Do(func() {})
+scheduler.New().EveryTwoMinutes().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="everytwoseconds"></a>EveryTwoSeconds
@@ -829,7 +830,7 @@ scheduler.New().EveryTwoMinutes().Do(func() {})
 EveryTwoSeconds schedules the job to run every 2 seconds.
 
 ```go
-scheduler.New().EveryTwoSeconds().Do(func() {})
+scheduler.New().EveryTwoSeconds().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="hourly"></a>Hourly
@@ -837,7 +838,7 @@ scheduler.New().EveryTwoSeconds().Do(func() {})
 Hourly schedules the job to run every hour.
 
 ```go
-scheduler.New().Hourly().Do(func() {})
+scheduler.New().Hourly().Do(func(context.Context) error { return nil })
 ```
 
 ### <a id="hourlyat"></a>HourlyAt
@@ -869,7 +870,7 @@ scheduler.New().Every(15).Minutes()
 Seconds schedules the job to run every X seconds.
 
 ```go
-scheduler.New().Every(3).Seconds().Do(func() {})
+scheduler.New().Every(3).Seconds().Do(func(context.Context) error { return nil })
 ```
 
 ## Lifecycle
@@ -949,7 +950,7 @@ _, _ = locker.Lock(context.Background(), "job")
 JobMetadata returns a copy of the tracked job metadata keyed by job ID.
 
 ```go
-b := scheduler.New().EverySecond().Do(func() {})
+b := scheduler.New().EverySecond().Do(func(context.Context) error { return nil })
 for id, meta := range b.JobMetadata() {
 	_ = id
 	_ = meta.Name
@@ -963,7 +964,7 @@ This is a facade-friendly list form of JobMetadata including paused state.
 
 ```go
 s := scheduler.New()
-s.EverySecond().Name("heartbeat").Do(func() {})
+s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 for _, job := range s.JobsInfo() {
 	_ = job.ID
 	_ = job.Name
@@ -1021,7 +1022,7 @@ RunNow calls for that job are skipped while paused.
 
 ```go
 s := scheduler.New()
-b := s.EverySecond().Name("heartbeat").Do(func() {})
+b := s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 _ = s.PauseJob(b.Job().ID())
 ```
 
@@ -1040,7 +1041,7 @@ ResumeJob resumes a paused job by ID.
 
 ```go
 s := scheduler.New()
-b := s.EverySecond().Name("heartbeat").Do(func() {})
+b := s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 _ = s.ResumeJob(b.Job().ID())
 ```
 
@@ -1052,8 +1053,8 @@ RetainState allows the job to retain its state after execution.
 
 ```go
 builder := scheduler.New().EverySecond().RetainState()
-builder.Do(func() {})
-builder.Do(func() {})
+builder.Do(func(context.Context) error { return nil })
+builder.Do(func(context.Context) error { return nil })
 ```
 
 ## Triggers
@@ -1073,6 +1074,6 @@ fmt.Println(builder.CronExpr())
 Do schedules the job with the provided task function.
 
 ```go
-scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func() {})
+scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func(context.Context) error { return nil })
 ```
 <!-- api:embed:end -->

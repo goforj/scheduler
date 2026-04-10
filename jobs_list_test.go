@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"io"
 	"os"
 	"testing"
@@ -18,7 +19,7 @@ func TestGetJobsListUsesMetadata(t *testing.T) {
 	jb := newJobBuilder(s)
 
 	jb.Cron("0 * * * *").Command("hello:world", "weekly")
-	jb.Every(2).Minutes().Name("funcJob").Do(func() {})
+	jb.Every(2).Minutes().Name("funcJob").Do(func(context.Context) error { return nil })
 
 	entries := jb.getJobsList()
 	require.Len(t, entries, 2)
@@ -74,7 +75,7 @@ func TestPrintJobsList(t *testing.T) {
 	jb := newJobBuilder(s)
 
 	jb.EveryMinute().Command("hello:world")
-	jb.EveryTwoMinutes().Do(func() {})
+	jb.EveryTwoMinutes().Do(func(context.Context) error { return nil })
 
 	// Capture stdout
 	r, w, err := os.Pipe()

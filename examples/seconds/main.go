@@ -1,10 +1,13 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// Seconds schedules the job to run every X seconds.
 
 	// Example: run a task every few seconds
-	scheduler.New().Every(3).Seconds().Do(func() {})
+	scheduler.New().Every(3).Seconds().Do(func(context.Context) error { return nil })
 }

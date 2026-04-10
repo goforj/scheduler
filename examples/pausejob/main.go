@@ -1,6 +1,9 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// PauseJob pauses execution for a specific scheduled job.
@@ -8,6 +11,6 @@ func main() {
 
 	// Example: pause one job by ID
 	s := scheduler.New()
-	b := s.EverySecond().Name("heartbeat").Do(func() {})
+	b := s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 	_ = s.PauseJob(b.Job().ID())
 }

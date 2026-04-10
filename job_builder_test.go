@@ -26,8 +26,8 @@ func (stubLock) Unlock(ctx context.Context) error { return nil }
 
 type testFoo struct{}
 
-func (testFoo) sample()     {}
-func (*testFoo) ptrSample() {}
+func (testFoo) sample(context.Context) error     { return nil }
+func (*testFoo) ptrSample(context.Context) error { return nil }
 
 func newTestScheduler(clock *clockwork.FakeClock) gocron.Scheduler {
 	s, err := gocron.NewScheduler(gocron.WithClock(clock))
@@ -43,7 +43,7 @@ func waitForJob(clock *clockwork.FakeClock, d time.Duration) {
 	time.Sleep(10 * time.Millisecond)
 }
 
-func sampleHandler() {}
+func sampleHandler(context.Context) error { return nil }
 
 func ptrDur(d time.Duration) *time.Duration { return &d }
 
@@ -54,7 +54,7 @@ func TestEverySecond_Do(t *testing.T) {
 
 	newJobBuilder(s).
 		EverySecond().
-		Do(func() { called.Store(true) })
+		Do(func(context.Context) error { called.Store(true); return nil })
 
 	waitForJob(clock, time.Second)
 	require.True(t, called.Load())
@@ -72,19 +72,19 @@ func TestWhenSkipAndEnvironments(t *testing.T) {
 	newJobBuilder(s).
 		Environments("production").
 		EverySecond().
-		Do(func() { called.Store(true) })
+		Do(func(context.Context) error { called.Store(true); return nil })
 	require.Len(t, newJobBuilder(s).JobMetadata(), 0)
 
 	newJobBuilder(s).
 		EverySecond().
 		When(func() bool { return false }).
-		Do(func() { called.Store(true) })
+		Do(func(context.Context) error { called.Store(true); return nil })
 	require.False(t, called.Load())
 
 	newJobBuilder(s).
 		EverySecond().
 		Skip(func() bool { return true }).
-		Do(func() { called.Store(true) })
+		Do(func(context.Context) error { called.Store(true); return nil })
 	require.False(t, called.Load())
 }
 
@@ -241,7 +241,10 @@ func TestFunctionMetadataFriendlyNameAndRetainState(t *testing.T) {
 	defer s.Shutdown()
 
 	var called atomic.Int32
-	fn := func() { called.Add(1) }
+	fn := func(context.Context) error {
+		called.Add(1)
+		return nil
+	}
 
 	f := newJobBuilder(s).
 		RetainState().
@@ -315,7 +318,7 @@ func TestOverlapAndLockerOptions(t *testing.T) {
 		WithoutOverlapping().
 		WithoutOverlappingWithLocker(stubLocker{}).
 		EverySecond().
-		Do(func() {})
+		Do(func(context.Context) error { return nil })
 
 	require.NotNil(t, f.Job())
 }
@@ -452,7 +455,7 @@ func TestDoWithoutScheduleErrors(t *testing.T) {
 	s := newTestScheduler(clockwork.NewFakeClock())
 	defer s.Shutdown()
 
-	f := newJobBuilder(s).Do(func() {})
+	f := newJobBuilder(s).Do(func(context.Context) error { return nil })
 	require.Error(t, f.Error())
 	require.Nil(t, f.Job())
 }
@@ -512,7 +515,7 @@ func TestDoWithPresetErrorSkipsScheduling(t *testing.T) {
 
 	f := newJobBuilder(s)
 	f.err = fmt.Errorf("boom")
-	f.Do(func() {})
+	f.Do(func(context.Context) error { return nil })
 	require.Nil(t, f.Job())
 }
 
@@ -524,17 +527,43 @@ func TestHooksRunForFunctionTasks(t *testing.T) {
 	var before, after, success atomic.Bool
 
 	f := newJobBuilder(s)
-	f.Before(func() { before.Store(true) }).
-		After(func() { after.Store(true) }).
-		OnSuccess(func() { success.Store(true) }).
+	f.Before(func(context.Context) { before.Store(true) }).
+		After(func(context.Context) { after.Store(true) }).
+		OnSuccess(func(context.Context) { success.Store(true) }).
 		EverySecond().
-		Do(func() {})
+		Do(func(context.Context) error { return nil })
 
 	waitForJob(clock, 3*time.Second)
 
 	require.True(t, before.Load())
 	require.True(t, after.Load())
 	require.True(t, success.Load())
+}
+
+func TestFailureHookReceivesError(t *testing.T) {
+	clock := clockwork.NewFakeClock()
+	s := newTestScheduler(clock)
+	defer s.Shutdown()
+
+	var failureCalled atomic.Bool
+	var receivedErr atomic.Pointer[error]
+
+	expectedErr := context.DeadlineExceeded
+
+	newJobBuilder(s).
+		OnFailure(func(_ context.Context, err error) {
+			failureCalled.Store(true)
+			receivedErr.Store(&err)
+		}).
+		EverySecond().
+		Do(func(context.Context) error { return expectedErr })
+
+	waitForJob(clock, 3*time.Second)
+
+	require.True(t, failureCalled.Load())
+	got := receivedErr.Load()
+	require.NotNil(t, got)
+	require.ErrorIs(t, *got, expectedErr)
 }
 
 func TestDaysOfMonth(t *testing.T) {
@@ -560,25 +589,25 @@ func TestDayConstraintsAndBetween(t *testing.T) {
 		Timezone("UTC").
 		Weekdays().
 		EverySecond().
-		Do(func() { weekdayCalled.Store(true) })
+		Do(func(context.Context) error { weekdayCalled.Store(true); return nil })
 
 	newJobBuilder(s).
 		Timezone("UTC").
 		Weekends().
 		EverySecond().
-		Do(func() { weekendCalled.Store(true) })
+		Do(func(context.Context) error { weekendCalled.Store(true); return nil })
 
 	newJobBuilder(s).
 		Timezone("UTC").
 		Between("08:00", "10:00").
 		EverySecond().
-		Do(func() { betweenCalled.Store(true) })
+		Do(func(context.Context) error { betweenCalled.Store(true); return nil })
 
 	newJobBuilder(s).
 		Timezone("UTC").
 		UnlessBetween("08:00", "10:00").
 		EverySecond().
-		Do(func() { unlessBetweenSkipped.Store(true) })
+		Do(func(context.Context) error { unlessBetweenSkipped.Store(true); return nil })
 
 	waitForJob(clock, time.Second)
 
@@ -605,13 +634,13 @@ func TestSpecificDayHelpers(t *testing.T) {
 		Timezone("UTC").
 		Mondays().
 		EverySecond().
-		Do(func() { mondayCalled.Store(true) })
+		Do(func(context.Context) error { mondayCalled.Store(true); return nil })
 
 	newJobBuilder(s).
 		Timezone("UTC").
 		Tuesdays().
 		EverySecond().
-		Do(func() { tuesdayCalled.Store(true) })
+		Do(func(context.Context) error { tuesdayCalled.Store(true); return nil })
 
 	waitForJob(clock, time.Second)
 
@@ -632,8 +661,8 @@ func TestSundayHelper(t *testing.T) {
 
 	var sundayCalled, saturdayCalled atomic.Bool
 
-	newJobBuilder(s).Timezone("UTC").Sundays().EverySecond().Do(func() { sundayCalled.Store(true) })
-	newJobBuilder(s).Timezone("UTC").Saturdays().EverySecond().Do(func() { saturdayCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Sundays().EverySecond().Do(func(context.Context) error { sundayCalled.Store(true); return nil })
+	newJobBuilder(s).Timezone("UTC").Saturdays().EverySecond().Do(func(context.Context) error { saturdayCalled.Store(true); return nil })
 
 	waitForJob(clock, time.Second)
 
@@ -654,9 +683,9 @@ func TestMidweekHelpers(t *testing.T) {
 
 	var wedCalled, thuCalled, friCalled atomic.Bool
 
-	newJobBuilder(s).Timezone("UTC").Wednesdays().EverySecond().Do(func() { wedCalled.Store(true) })
-	newJobBuilder(s).Timezone("UTC").Thursdays().EverySecond().Do(func() { thuCalled.Store(true) })
-	newJobBuilder(s).Timezone("UTC").Fridays().EverySecond().Do(func() { friCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Wednesdays().EverySecond().Do(func(context.Context) error { wedCalled.Store(true); return nil })
+	newJobBuilder(s).Timezone("UTC").Thursdays().EverySecond().Do(func(context.Context) error { thuCalled.Store(true); return nil })
+	newJobBuilder(s).Timezone("UTC").Fridays().EverySecond().Do(func(context.Context) error { friCalled.Store(true); return nil })
 
 	waitForJob(clock, time.Second)
 
@@ -702,8 +731,8 @@ func TestBetweenCrossesMidnight(t *testing.T) {
 
 	var betweenCalled, unlessBetweenCalled atomic.Bool
 
-	newJobBuilder(s).Timezone("UTC").Between("23:00", "02:00").EverySecond().Do(func() { betweenCalled.Store(true) })
-	newJobBuilder(s).Timezone("UTC").UnlessBetween("23:00", "02:00").EverySecond().Do(func() { unlessBetweenCalled.Store(true) })
+	newJobBuilder(s).Timezone("UTC").Between("23:00", "02:00").EverySecond().Do(func(context.Context) error { betweenCalled.Store(true); return nil })
+	newJobBuilder(s).Timezone("UTC").UnlessBetween("23:00", "02:00").EverySecond().Do(func(context.Context) error { unlessBetweenCalled.Store(true); return nil })
 
 	waitForJob(clock, time.Second)
 
@@ -844,16 +873,16 @@ func TestDoWithFiltersSkipping(t *testing.T) {
 	s := newTestScheduler(clockwork.NewFakeClock())
 	defer s.Shutdown()
 
-	b := newJobBuilder(s).Environments("production").EverySecond().Do(func() {})
+	b := newJobBuilder(s).Environments("production").EverySecond().Do(func(context.Context) error { return nil })
 	require.Nil(t, b.Job())
 
-	b = newJobBuilder(s).EverySecond().When(func() bool { return false }).Do(func() {})
+	b = newJobBuilder(s).EverySecond().When(func() bool { return false }).Do(func(context.Context) error { return nil })
 	require.Nil(t, b.Job())
 }
 
 func TestDoWithoutSchedule(t *testing.T) {
 	b := newJobBuilder(nil)
-	b.Do(func() {})
+	b.Do(func(context.Context) error { return nil })
 	require.Error(t, b.Error())
 }
 

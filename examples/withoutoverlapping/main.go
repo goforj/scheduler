@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"github.com/goforj/scheduler"
 	"time"
 )
@@ -12,5 +13,5 @@ func main() {
 	scheduler.New().
 		WithoutOverlapping().
 		EveryFiveSeconds().
-		Do(func() { time.Sleep(7 * time.Second) })
+		Do(func(context.Context) error { time.Sleep(7 * time.Second); return nil })
 }

@@ -114,7 +114,7 @@ func (j *JobBuilder) getJobsList() []*jobEntry {
 //
 //	s := scheduler.New()
 //	defer s.Stop()
-//	s.EverySecond().Name("heartbeat").Do(func() {})
+//	s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 //	s.PrintJobsList()
 //	// Output:
 //	// +------------------------------------------------------------------------------------------+

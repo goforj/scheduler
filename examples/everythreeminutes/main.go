@@ -1,10 +1,13 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// EveryThreeMinutes schedules the job to run every 3 minutes.
 
 	// Example: run every three minutes
-	scheduler.New().EveryThreeMinutes().Do(func() {})
+	scheduler.New().EveryThreeMinutes().Do(func(context.Context) error { return nil })
 }

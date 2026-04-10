@@ -21,7 +21,7 @@ func TestSchedulerEveryDo(t *testing.T) {
 	defer func() { _ = s.Stop() }()
 
 	var called atomic.Bool
-	s.Every(1).Seconds().Do(func() { called.Store(true) })
+	s.Every(1).Seconds().Do(func(context.Context) error { called.Store(true); return nil })
 
 	clock.Advance(time.Second)
 	require.Eventually(t, called.Load, 150*time.Millisecond, 10*time.Millisecond)
@@ -57,7 +57,7 @@ func TestPauseResumeAllUniversal(t *testing.T) {
 		return nil
 	})
 
-	s.WithCommandRunner(runner).EverySecond().Do(func() { doCount.Add(1) })
+	s.WithCommandRunner(runner).EverySecond().Do(func(context.Context) error { doCount.Add(1); return nil })
 	s.WithCommandRunner(runner).EverySecond().Command("noop")
 	s.WithCommandRunner(runner).EverySecond().Exec("/usr/bin/env", "echo", "ok")
 
@@ -95,7 +95,7 @@ func TestPauseResumeSingleJobByTargetKind(t *testing.T) {
 		{
 			name: "function",
 			schedule: func(s *Scheduler, hits *atomic.Int32) {
-				s.EverySecond().Name("fn").Do(func() { hits.Add(1) })
+				s.EverySecond().Name("fn").Do(func(context.Context) error { hits.Add(1); return nil })
 			},
 		},
 		{
@@ -158,7 +158,7 @@ func TestRunNowWhenPausedIsSkippedUntilResumed(t *testing.T) {
 	defer func() { _ = s.Stop() }()
 
 	var hits atomic.Int32
-	b := s.EverySecond().Do(func() { hits.Add(1) })
+	b := s.EverySecond().Do(func(context.Context) error { hits.Add(1); return nil })
 	require.NotNil(t, b.Job())
 	id := b.Job().ID()
 
@@ -176,7 +176,7 @@ func TestRunNowWhenGloballyPausedIsSkippedUntilResumed(t *testing.T) {
 	defer func() { _ = s.Stop() }()
 
 	var hits atomic.Int32
-	b := s.EverySecond().Do(func() { hits.Add(1) })
+	b := s.EverySecond().Do(func(context.Context) error { hits.Add(1); return nil })
 	require.NotNil(t, b.Job())
 
 	require.NoError(t, s.PauseAll())
@@ -193,8 +193,8 @@ func TestJobsInfoIncludesPausedAndIsStable(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = s.Stop() }()
 
-	s.EverySecond().Name("b").Do(func() {})
-	s.EverySecond().Name("a").Do(func() {})
+	s.EverySecond().Name("b").Do(func(context.Context) error { return nil })
+	s.EverySecond().Name("a").Do(func(context.Context) error { return nil })
 
 	jobs := s.JobsInfo()
 	require.Len(t, jobs, 2)

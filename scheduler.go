@@ -22,7 +22,7 @@ type Scheduler struct {
 //
 //	s := scheduler.New()
 //	defer s.Stop()
-//	s.Every(15).Seconds().Do(func() {})
+//	s.Every(15).Seconds().Do(func(context.Context) error { return nil })
 func New(options ...gocron.SchedulerOption) *Scheduler {
 	s, err := NewWithError(options...)
 	if err != nil {

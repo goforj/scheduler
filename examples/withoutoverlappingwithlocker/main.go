@@ -17,5 +17,5 @@ func main() {
 	scheduler.New().
 		WithoutOverlappingWithLocker(locker).
 		EveryMinute().
-		Do(func() {})
+		Do(func(context.Context) error { return nil })
 }

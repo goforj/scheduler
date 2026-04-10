@@ -1,10 +1,13 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// EveryTwoSeconds schedules the job to run every 2 seconds.
 
 	// Example: throttle a task to two seconds
-	scheduler.New().EveryTwoSeconds().Do(func() {})
+	scheduler.New().EveryTwoSeconds().Do(func(context.Context) error { return nil })
 }

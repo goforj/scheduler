@@ -107,10 +107,10 @@ type JobBuilder struct {
 }
 
 type taskHooks struct {
-	Before    func()
-	After     func()
-	OnSuccess func()
-	OnFailure func()
+	Before    func(context.Context)
+	After     func(context.Context)
+	OnSuccess func(context.Context)
+	OnFailure func(context.Context, error)
 }
 
 func newJobBuilder(s SchedulerAdapter) *JobBuilder {
@@ -169,8 +169,8 @@ type JobMetadata struct {
 // Example: reuse interval configuration for multiple jobs
 //
 //	builder := scheduler.New().EverySecond().RetainState()
-//	builder.Do(func() {})
-//	builder.Do(func() {})
+//	builder.Do(func(context.Context) error { return nil })
+//	builder.Do(func(context.Context) error { return nil })
 func (j *JobBuilder) RetainState() *JobBuilder {
 	j.retainState = true
 	return j
@@ -210,15 +210,12 @@ func (j *JobBuilder) buildTags(jobName string) []string {
 //
 // Example: create a named cron job
 //
-//	scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func() {})
-func (j *JobBuilder) Do(task func()) *JobBuilder {
-	return j.doWithRunner(task, func() error {
-		task()
-		return nil
-	})
+//	scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func(context.Context) error { return nil })
+func (j *JobBuilder) Do(task func(context.Context) error) *JobBuilder {
+	return j.doWithRunner(task)
 }
 
-func (j *JobBuilder) doWithRunner(task func(), run func() error) *JobBuilder {
+func (j *JobBuilder) doWithRunner(task func(context.Context) error) *JobBuilder {
 	if j.err != nil {
 		return j
 	}
@@ -275,7 +272,7 @@ func (j *JobBuilder) doWithRunner(task func(), run func() error) *JobBuilder {
 
 	var jobID uuid.UUID
 	taskToRun := func() {
-		j.executeRun(jobID, run, localHooks, bg)
+		j.executeRun(jobID, task, localHooks, bg)
 	}
 
 	var job gocron.Job
@@ -347,7 +344,7 @@ func (j *JobBuilder) resetState() {
 //	scheduler.New().
 //		WithoutOverlapping().
 //		EveryFiveSeconds().
-//		Do(func() { time.Sleep(7 * time.Second) })
+//		Do(func(context.Context) error { time.Sleep(7 * time.Second); return nil })
 func (j *JobBuilder) WithoutOverlapping() *JobBuilder {
 	j.withoutOverlap = true
 	return j
@@ -414,7 +411,7 @@ type FluentEvery struct {
 //
 // Example: run a task every few seconds
 //
-//	scheduler.New().Every(3).Seconds().Do(func() {})
+//	scheduler.New().Every(3).Seconds().Do(func(context.Context) error { return nil })
 func (fe *FluentEvery) Seconds() *JobBuilder {
 	return fe.base.every(time.Duration(fe.interval) * time.Second)
 }
@@ -444,7 +441,7 @@ func (fe *FluentEvery) Hours() *JobBuilder {
 //
 // Example: heartbeat job each second
 //
-//	scheduler.New().EverySecond().Do(func() {})
+//	scheduler.New().EverySecond().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EverySecond() *JobBuilder {
 	return j.every(1 * time.Second)
 }
@@ -454,7 +451,7 @@ func (j *JobBuilder) EverySecond() *JobBuilder {
 //
 // Example: throttle a task to two seconds
 //
-//	scheduler.New().EveryTwoSeconds().Do(func() {})
+//	scheduler.New().EveryTwoSeconds().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryTwoSeconds() *JobBuilder {
 	return j.every(2 * time.Second)
 }
@@ -464,7 +461,7 @@ func (j *JobBuilder) EveryTwoSeconds() *JobBuilder {
 //
 // Example: space out work every five seconds
 //
-//	scheduler.New().EveryFiveSeconds().Do(func() {})
+//	scheduler.New().EveryFiveSeconds().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryFiveSeconds() *JobBuilder {
 	return j.every(5 * time.Second)
 }
@@ -474,7 +471,7 @@ func (j *JobBuilder) EveryFiveSeconds() *JobBuilder {
 //
 // Example: poll every ten seconds
 //
-//	scheduler.New().EveryTenSeconds().Do(func() {})
+//	scheduler.New().EveryTenSeconds().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryTenSeconds() *JobBuilder {
 	return j.every(10 * time.Second)
 }
@@ -484,7 +481,7 @@ func (j *JobBuilder) EveryTenSeconds() *JobBuilder {
 //
 // Example: run at fifteen-second cadence
 //
-//	scheduler.New().EveryFifteenSeconds().Do(func() {})
+//	scheduler.New().EveryFifteenSeconds().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryFifteenSeconds() *JobBuilder {
 	return j.every(15 * time.Second)
 }
@@ -494,7 +491,7 @@ func (j *JobBuilder) EveryFifteenSeconds() *JobBuilder {
 //
 // Example: run once every twenty seconds
 //
-//	scheduler.New().EveryTwentySeconds().Do(func() {})
+//	scheduler.New().EveryTwentySeconds().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryTwentySeconds() *JobBuilder {
 	return j.every(20 * time.Second)
 }
@@ -504,7 +501,7 @@ func (j *JobBuilder) EveryTwentySeconds() *JobBuilder {
 //
 // Example: execute every thirty seconds
 //
-//	scheduler.New().EveryThirtySeconds().Do(func() {})
+//	scheduler.New().EveryThirtySeconds().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryThirtySeconds() *JobBuilder {
 	return j.every(30 * time.Second)
 }
@@ -514,7 +511,7 @@ func (j *JobBuilder) EveryThirtySeconds() *JobBuilder {
 //
 // Example: run a task each minute
 //
-//	scheduler.New().EveryMinute().Do(func() {})
+//	scheduler.New().EveryMinute().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryMinute() *JobBuilder {
 	return j.every(1 * time.Minute)
 }
@@ -524,7 +521,7 @@ func (j *JobBuilder) EveryMinute() *JobBuilder {
 //
 // Example: job that runs every two minutes
 //
-//	scheduler.New().EveryTwoMinutes().Do(func() {})
+//	scheduler.New().EveryTwoMinutes().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryTwoMinutes() *JobBuilder {
 	return j.every(2 * time.Minute)
 }
@@ -534,7 +531,7 @@ func (j *JobBuilder) EveryTwoMinutes() *JobBuilder {
 //
 // Example: run every three minutes
 //
-//	scheduler.New().EveryThreeMinutes().Do(func() {})
+//	scheduler.New().EveryThreeMinutes().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryThreeMinutes() *JobBuilder {
 	return j.every(3 * time.Minute)
 }
@@ -544,7 +541,7 @@ func (j *JobBuilder) EveryThreeMinutes() *JobBuilder {
 //
 // Example: run every four minutes
 //
-//	scheduler.New().EveryFourMinutes().Do(func() {})
+//	scheduler.New().EveryFourMinutes().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryFourMinutes() *JobBuilder {
 	return j.every(4 * time.Minute)
 }
@@ -554,7 +551,7 @@ func (j *JobBuilder) EveryFourMinutes() *JobBuilder {
 //
 // Example: run every five minutes
 //
-//	scheduler.New().EveryFiveMinutes().Do(func() {})
+//	scheduler.New().EveryFiveMinutes().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryFiveMinutes() *JobBuilder {
 	return j.every(5 * time.Minute)
 }
@@ -564,7 +561,7 @@ func (j *JobBuilder) EveryFiveMinutes() *JobBuilder {
 //
 // Example: run every ten minutes
 //
-//	scheduler.New().EveryTenMinutes().Do(func() {})
+//	scheduler.New().EveryTenMinutes().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryTenMinutes() *JobBuilder {
 	return j.every(10 * time.Minute)
 }
@@ -574,7 +571,7 @@ func (j *JobBuilder) EveryTenMinutes() *JobBuilder {
 //
 // Example: run every fifteen minutes
 //
-//	scheduler.New().EveryFifteenMinutes().Do(func() {})
+//	scheduler.New().EveryFifteenMinutes().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryFifteenMinutes() *JobBuilder {
 	return j.every(15 * time.Minute)
 }
@@ -584,7 +581,7 @@ func (j *JobBuilder) EveryFifteenMinutes() *JobBuilder {
 //
 // Example: run every thirty minutes
 //
-//	scheduler.New().EveryThirtyMinutes().Do(func() {})
+//	scheduler.New().EveryThirtyMinutes().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) EveryThirtyMinutes() *JobBuilder {
 	return j.every(30 * time.Minute)
 }
@@ -594,7 +591,7 @@ func (j *JobBuilder) EveryThirtyMinutes() *JobBuilder {
 //
 // Example: run something hourly
 //
-//	scheduler.New().Hourly().Do(func() {})
+//	scheduler.New().Hourly().Do(func(context.Context) error { return nil })
 func (j *JobBuilder) Hourly() *JobBuilder {
 	return j.every(1 * time.Hour)
 }
@@ -930,7 +927,7 @@ func (j *JobBuilder) CronExpr() string {
 //
 // Example: capture the last job handle
 //
-//	b := scheduler.New().EverySecond().Do(func() {})
+//	b := scheduler.New().EverySecond().Do(func(context.Context) error { return nil })
 //	fmt.Println(b.Job() != nil)
 //	// Output: true
 func (j *JobBuilder) Job() gocron.Job {
@@ -949,7 +946,7 @@ func (j *JobBuilder) Job() gocron.Job {
 //	scheduler.New().
 //		WithoutOverlappingWithLocker(locker).
 //		EveryMinute().
-//		Do(func() {})
+//		Do(func(context.Context) error { return nil })
 func (j *JobBuilder) WithoutOverlappingWithLocker(locker gocron.Locker) *JobBuilder {
 	j.withoutOverlap = true
 	j.distributedLocker = locker
@@ -1018,8 +1015,8 @@ func (j *JobBuilder) RunInBackground() *JobBuilder {
 //
 // Example: add a before hook
 //
-//	scheduler.New().Before(func() {}).Daily()
-func (j *JobBuilder) Before(fn func()) *JobBuilder {
+//	scheduler.New().Before(func(context.Context) {}).Daily()
+func (j *JobBuilder) Before(fn func(context.Context)) *JobBuilder {
 	j.hooks.Before = fn
 	return j
 }
@@ -1029,8 +1026,8 @@ func (j *JobBuilder) Before(fn func()) *JobBuilder {
 //
 // Example: add an after hook
 //
-//	scheduler.New().After(func() {}).Daily()
-func (j *JobBuilder) After(fn func()) *JobBuilder {
+//	scheduler.New().After(func(context.Context) {}).Daily()
+func (j *JobBuilder) After(fn func(context.Context)) *JobBuilder {
 	j.hooks.After = fn
 	return j
 }
@@ -1040,8 +1037,8 @@ func (j *JobBuilder) After(fn func()) *JobBuilder {
 //
 // Example: record success
 //
-//	scheduler.New().OnSuccess(func() {}).Daily()
-func (j *JobBuilder) OnSuccess(fn func()) *JobBuilder {
+//	scheduler.New().OnSuccess(func(context.Context) {}).Daily()
+func (j *JobBuilder) OnSuccess(fn func(context.Context)) *JobBuilder {
 	j.hooks.OnSuccess = fn
 	return j
 }
@@ -1051,8 +1048,8 @@ func (j *JobBuilder) OnSuccess(fn func()) *JobBuilder {
 //
 // Example: record failures
 //
-//	scheduler.New().OnFailure(func() {}).Daily()
-func (j *JobBuilder) OnFailure(fn func()) *JobBuilder {
+//	scheduler.New().OnFailure(func(context.Context, error) {}).Daily()
+func (j *JobBuilder) OnFailure(fn func(context.Context, error)) *JobBuilder {
 	j.hooks.OnFailure = fn
 	return j
 }
@@ -1273,8 +1270,7 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 		j.extraTags = []string{fmt.Sprintf("args=\"%s\"", joined)}
 	}
 
-	task := func() {}
-	run := func() error {
+	task := func(ctx context.Context) error {
 		if j.err != nil {
 			return j.err
 		}
@@ -1288,7 +1284,7 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 			exe = self
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 600*time.Second)
+		ctx, cancel := context.WithTimeout(ctx, 600*time.Second)
 		defer cancel()
 
 		cmdArgs := args
@@ -1298,7 +1294,7 @@ func (j *JobBuilder) scheduleExecTarget(commandOrExecutable string, args []strin
 		return j.commandRunner.Run(ctx, exe, cmdArgs)
 	}
 
-	return j.doWithRunner(task, run)
+	return j.doWithRunner(task)
 }
 
 // PauseAll pauses execution for all scheduled jobs without removing them.
@@ -1340,7 +1336,7 @@ func (j *JobBuilder) ResumeAll() error {
 // Example: pause one job by ID
 //
 //	s := scheduler.New()
-//	b := s.EverySecond().Name("heartbeat").Do(func() {})
+//	b := s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 //	_ = s.PauseJob(b.Job().ID())
 func (j *JobBuilder) PauseJob(id uuid.UUID) error {
 	if j.state == nil {
@@ -1356,7 +1352,7 @@ func (j *JobBuilder) PauseJob(id uuid.UUID) error {
 // Example: resume one job by ID
 //
 //	s := scheduler.New()
-//	b := s.EverySecond().Name("heartbeat").Do(func() {})
+//	b := s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 //	_ = s.ResumeJob(b.Job().ID())
 func (j *JobBuilder) ResumeJob(id uuid.UUID) error {
 	if j.state == nil {
@@ -1409,7 +1405,7 @@ func (j *JobBuilder) Observe(observer JobObserver) *JobBuilder {
 //
 // Example: inspect scheduled jobs
 //
-//	b := scheduler.New().EverySecond().Do(func() {})
+//	b := scheduler.New().EverySecond().Do(func(context.Context) error { return nil })
 //	for id, meta := range b.JobMetadata() {
 //		_ = id
 //		_ = meta.Name
@@ -1428,7 +1424,7 @@ func (j *JobBuilder) JobMetadata() map[uuid.UUID]JobMetadata {
 // Example: iterate jobs for UI rendering
 //
 //	s := scheduler.New()
-//	s.EverySecond().Name("heartbeat").Do(func() {})
+//	s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 //	for _, job := range s.JobsInfo() {
 //		_ = job.ID
 //		_ = job.Name
@@ -1441,7 +1437,7 @@ func (j *JobBuilder) JobsInfo() []JobMetadata {
 	return j.state.metadataList()
 }
 
-func (j *JobBuilder) recordJob(job gocron.Job, task func()) {
+func (j *JobBuilder) recordJob(job gocron.Job, task any) {
 	if j.state == nil {
 		j.state = newRuntimeState()
 	}
@@ -1500,7 +1496,7 @@ func buildCommandString(name string, args []string) string {
 	return strings.TrimSpace(name + " " + strings.Join(args, " "))
 }
 
-func friendlyFuncName(fn func()) string {
+func friendlyFuncName(fn any) string {
 	if fn == nil {
 		return ""
 	}
@@ -1570,7 +1566,7 @@ func (j *JobBuilder) location() *time.Location {
 	return loc
 }
 
-func (j *JobBuilder) executeRun(jobID uuid.UUID, run func() error, hooks taskHooks, bg bool) {
+func (j *JobBuilder) executeRun(jobID uuid.UUID, run func(context.Context) error, hooks taskHooks, bg bool) {
 	execFn := func() {
 		if j.state != nil && j.state.isExecutionPaused(jobID) {
 			meta := j.JobMetadata()[jobID]
@@ -1603,15 +1599,16 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func() error, hooks taskHoo
 			})
 		}
 
+		runCtx := context.Background()
 		if hooks.Before != nil {
-			hooks.Before()
+			hooks.Before(runCtx)
 		}
 
-		err := run()
+		err := run(runCtx)
 		duration := time.Since(start)
 		if err != nil {
 			if hooks.OnFailure != nil {
-				hooks.OnFailure()
+				hooks.OnFailure(runCtx, err)
 			}
 			if j.state != nil {
 				j.state.emit(JobEvent{
@@ -1627,7 +1624,7 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func() error, hooks taskHoo
 			}
 		} else {
 			if hooks.OnSuccess != nil {
-				hooks.OnSuccess()
+				hooks.OnSuccess(runCtx)
 			}
 			if j.state != nil {
 				j.state.emit(JobEvent{
@@ -1643,7 +1640,7 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func() error, hooks taskHoo
 		}
 
 		if hooks.After != nil {
-			hooks.After()
+			hooks.After(runCtx)
 		}
 	}
 

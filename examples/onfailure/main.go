@@ -1,10 +1,13 @@
 package main
 
-import "github.com/goforj/scheduler"
+import (
+	"context"
+	"github.com/goforj/scheduler"
+)
 
 func main() {
 	// OnFailure sets a hook to run after failed task execution.
 
 	// Example: record failures
-	scheduler.New().OnFailure(func() {}).Daily()
+	scheduler.New().OnFailure(func(context.Context, error) {}).Daily()
 }

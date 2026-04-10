@@ -45,10 +45,14 @@ func TestWithCommandRunnerAndFailureHook(t *testing.T) {
 	done := make(chan struct{})
 	runner := &stubRunner{err: fmt.Errorf("boom"), done: done}
 	var failureCalled bool
+	var failureErr error
 
 	jb := newJobBuilder(s).
 		WithCommandRunner(runner).
-		OnFailure(func() { failureCalled = true }).
+		OnFailure(func(_ context.Context, err error) {
+			failureCalled = true
+			failureErr = err
+		}).
 		Cron("0 0 * * *").
 		Command("hello:world")
 
@@ -63,4 +67,5 @@ func TestWithCommandRunnerAndFailureHook(t *testing.T) {
 
 	require.Equal(t, 1, runner.called)
 	require.True(t, failureCalled)
+	require.ErrorIs(t, failureErr, runner.err)
 }
