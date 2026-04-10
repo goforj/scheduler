@@ -1,4 +1,4 @@
-module github.com/goforj/scheduler
+module github.com/goforj/scheduler/v2
 
 go 1.24.4
 

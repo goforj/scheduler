@@ -1,6 +1,6 @@
 package main
 
-import "github.com/goforj/scheduler"
+import "github.com/goforj/scheduler/v2"
 
 func main() {
 	// Weekdays limits the job to run only on weekdays (Mon-Fri).

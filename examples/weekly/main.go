@@ -1,6 +1,6 @@
 package main
 
-import "github.com/goforj/scheduler"
+import "github.com/goforj/scheduler/v2"
 
 func main() {
 	// Weekly schedules the job to run once per week on Sunday at midnight.

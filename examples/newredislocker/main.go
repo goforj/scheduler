@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"github.com/goforj/scheduler"
+	"github.com/goforj/scheduler/v2"
 	"github.com/redis/go-redis/v9"
 	"time"
 )

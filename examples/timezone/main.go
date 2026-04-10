@@ -1,6 +1,6 @@
 package main
 
-import "github.com/goforj/scheduler"
+import "github.com/goforj/scheduler/v2"
 
 func main() {
 	// Timezone sets a timezone string for the job (not currently applied to gocron Scheduler).

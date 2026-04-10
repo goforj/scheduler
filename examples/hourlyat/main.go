@@ -1,6 +1,6 @@
 package main
 
-import "github.com/goforj/scheduler"
+import "github.com/goforj/scheduler/v2"
 
 func main() {
 	// HourlyAt schedules the job to run every hour at the specified minute.

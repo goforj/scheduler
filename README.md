@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-    <a href="https://pkg.go.dev/github.com/goforj/scheduler"><img src="https://pkg.go.dev/badge/github.com/goforj/scheduler.svg" alt="Go Reference"></a>
+    <a href="https://pkg.go.dev/github.com/goforj/scheduler/v2"><img src="https://pkg.go.dev/badge/github.com/goforj/scheduler/v2.svg" alt="Go Reference"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
     <a href="https://github.com/goforj/scheduler/actions"><img src="https://github.com/goforj/scheduler/actions/workflows/test.yml/badge.svg" alt="Go Test"></a>
     <a href="https://golang.org"><img src="https://img.shields.io/badge/go-1.18+-blue?logo=go" alt="Go version"></a>
@@ -16,7 +16,7 @@
 <!-- test-count:embed:start -->
     <img src="https://img.shields.io/badge/tests-219-brightgreen" alt="Tests">
 <!-- test-count:embed:end -->
-    <a href="https://goreportcard.com/report/github.com/goforj/scheduler"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler" alt="Go Report Card"></a>
+    <a href="https://goreportcard.com/report/github.com/goforj/scheduler/v2"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler/v2" alt="Go Report Card"></a>
 </p>
 
 ## Features
@@ -38,7 +38,7 @@ Everything remains explicit, testable, and inspectable, while staying pleasant t
 ## Installation
 
 ```bash
-go get github.com/goforj/scheduler
+go get github.com/goforj/scheduler/v2
 ```
 
 If you use distributed locking, there are two paths:
@@ -102,7 +102,7 @@ package main
 
 import (
 	"context"
-	"github.com/goforj/scheduler"
+	"github.com/goforj/scheduler/v2"
 )
 
 func main() {

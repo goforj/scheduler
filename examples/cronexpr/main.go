@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/goforj/scheduler"
+	"github.com/goforj/scheduler/v2"
 )
 
 func main() {

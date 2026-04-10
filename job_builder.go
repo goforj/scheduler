@@ -1518,6 +1518,8 @@ func friendlyFuncName(fn any) string {
 	name = funcRe.ReplaceAllString(name, "")
 
 	name = filepath.ToSlash(name)
+	majorPathRe := regexp.MustCompile(`/v\d+\.`)
+	name = majorPathRe.ReplaceAllString(name, ".")
 	if idx := strings.LastIndex(name, "/"); idx != -1 && idx+1 < len(name) {
 		name = name[idx+1:]
 	}

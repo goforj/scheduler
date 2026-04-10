@@ -1,6 +1,6 @@
 package main
 
-import "github.com/goforj/scheduler"
+import "github.com/goforj/scheduler/v2"
 
 func main() {
 	// NewWithError creates and starts a scheduler facade and returns setup errors.

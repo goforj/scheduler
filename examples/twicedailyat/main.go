@@ -1,6 +1,6 @@
 package main
 
-import "github.com/goforj/scheduler"
+import "github.com/goforj/scheduler/v2"
 
 func main() {
 	// TwiceDailyAt schedules the job to run daily at two specified times (e.g., 1:15 and 13:15).

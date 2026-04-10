@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/goforj/scheduler"
+	"github.com/goforj/scheduler/v2"
 	"time"
 )
 

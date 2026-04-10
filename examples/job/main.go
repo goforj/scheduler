@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/goforj/scheduler"
+	"github.com/goforj/scheduler/v2"
 )
 
 func main() {

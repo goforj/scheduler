@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/goforj/cache"
 	"github.com/goforj/cache/driver/rediscache"
-	"github.com/goforj/scheduler"
+	"github.com/goforj/scheduler/v2"
 	"time"
 )
 

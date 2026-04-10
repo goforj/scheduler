@@ -1,6 +1,6 @@
 package main
 
-import "github.com/goforj/scheduler"
+import "github.com/goforj/scheduler/v2"
 
 func main() {
 	// QuarterlyOn schedules the job to run on a specific day of each quarter at a given time.

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"github.com/go-co-op/gocron/v2"
-	"github.com/goforj/scheduler"
+	"github.com/goforj/scheduler/v2"
 )
 
 func main() {

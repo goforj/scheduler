@@ -403,7 +403,7 @@ func writeMain(base string, fd *FuncDoc, importPath string) error {
 			imports["github.com/go-co-op/gocron/v2"] = true
 		}
 		if strings.Contains(ex.Code, "scheduler") {
-			imports["github.com/goforj/scheduler"] = true
+			imports["github.com/goforj/scheduler/v2"] = true
 		}
 		if strings.Contains(ex.Code, "filepath.") {
 			imports["path/filepath"] = true
