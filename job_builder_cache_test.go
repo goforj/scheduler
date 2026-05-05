@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/goforj/cache"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,24 +21,15 @@ func (m *mockCacheLockClient) TryLock(key string, ttl time.Duration) (bool, erro
 	return m.tryLockResult, m.tryLockErr
 }
 
-func (m *mockCacheLockClient) TryLockContext(ctx context.Context, key string, ttl time.Duration) (bool, error) {
-	return m.tryLockResult, m.tryLockErr
+func (m *mockCacheLockClient) WithContext(context.Context) cache.LockAPI {
+	return m
 }
 
 func (m *mockCacheLockClient) Lock(key string, ttl, timeout time.Duration) (bool, error) {
 	return m.tryLockResult, m.tryLockErr
 }
 
-func (m *mockCacheLockClient) LockContext(ctx context.Context, key string, ttl, retryInterval time.Duration) (bool, error) {
-	return m.tryLockResult, m.tryLockErr
-}
-
 func (m *mockCacheLockClient) Unlock(key string) error {
-	m.unlockCalls++
-	return m.unlockErr
-}
-
-func (m *mockCacheLockClient) UnlockContext(ctx context.Context, key string) error {
 	m.unlockCalls++
 	return m.unlockErr
 }
