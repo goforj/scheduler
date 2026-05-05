@@ -14,7 +14,7 @@
     <img src="https://img.shields.io/github/v/tag/goforj/scheduler?label=version&sort=semver" alt="Latest tag">
     <a href="https://codecov.io/gh/goforj/scheduler" ><img src="https://codecov.io/github/goforj/scheduler/graph/badge.svg?token=9KT46ZORP3"/></a>
 <!-- test-count:embed:start -->
-    <img src="https://img.shields.io/badge/tests-219-brightgreen" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-223-brightgreen" alt="Tests">
 <!-- test-count:embed:end -->
     <a href="https://goreportcard.com/report/github.com/goforj/scheduler/v2"><img src="https://goreportcard.com/badge/github.com/goforj/scheduler/v2" alt="Go Report Card"></a>
 </p>
@@ -161,8 +161,8 @@ This guarantees all examples are valid, up-to-date, and remain functional as the
 | **Intervals** | [Every](#every) [EveryDuration](#everyduration) [EveryFifteenMinutes](#everyfifteenminutes) [EveryFifteenSeconds](#everyfifteenseconds) [EveryFiveMinutes](#everyfiveminutes) [EveryFiveSeconds](#everyfiveseconds) [EveryFourHours](#everyfourhours) [EveryFourMinutes](#everyfourminutes) [EveryMinute](#everyminute) [EveryOddHour](#everyoddhour) [EverySecond](#everysecond) [EverySixHours](#everysixhours) [EveryTenMinutes](#everytenminutes) [EveryTenSeconds](#everytenseconds) [EveryThirtyMinutes](#everythirtyminutes) [EveryThirtySeconds](#everythirtyseconds) [EveryThreeHours](#everythreehours) [EveryThreeMinutes](#everythreeminutes) [EveryTwentySeconds](#everytwentyseconds) [EveryTwoHours](#everytwohours) [EveryTwoMinutes](#everytwominutes) [EveryTwoSeconds](#everytwoseconds) [Hourly](#hourly) [HourlyAt](#hourlyat) [Hours](#hours) [Minutes](#minutes) [Seconds](#seconds) |
 | **Lifecycle** | [Shutdown](#shutdown) [Start](#start) [Stop](#stop) |
 | **Locking** | [NewCacheLocker](#newcachelocker) [NewRedisLocker](#newredislocker) |
-| **Metadata** | [JobMetadata](#jobmetadata) [JobsInfo](#jobsinfo) [Name](#name) |
-| **Runtime control** | [IsJobPaused](#isjobpaused) [IsPausedAll](#ispausedall) [Observe](#observe) [PauseAll](#pauseall) [PauseJob](#pausejob) [ResumeAll](#resumeall) [ResumeJob](#resumejob) |
+| **Metadata** | [Admin](#admin) [IsPausedAll](#ispausedall) [JobMetadata](#jobmetadata) [JobsInfo](#jobsinfo) [ListSchedules](#listschedules) [Name](#name) [PauseAll](#pauseall) [PauseSchedule](#pauseschedule) [RestartSchedule](#restartschedule) [ResumeAll](#resumeall) [ResumeSchedule](#resumeschedule) |
+| **Runtime control** | [IsJobPaused](#isjobpaused) [Observe](#observe) [PauseJob](#pausejob) [ResumeJob](#resumejob) |
 | **State management** | [RetainState](#retainstate) |
 | **Triggers** | [Cron](#cron) [Do](#do) |
 
@@ -945,6 +945,14 @@ _, _ = locker.Lock(context.Background(), "job")
 
 ## Metadata
 
+### <a id="admin"></a>Admin
+
+Admin returns a facade for scheduler inspection and control operations.
+
+### <a id="ispausedall"></a>IsPausedAll
+
+IsPausedAll reports whether all schedules are currently paused.
+
 ### <a id="jobmetadata"></a>JobMetadata
 
 JobMetadata returns a copy of the tracked job metadata keyed by job ID.
@@ -972,6 +980,10 @@ for _, job := range s.JobsInfo() {
 }
 ```
 
+### <a id="listschedules"></a>ListSchedules
+
+ListSchedules returns a stable UI-friendly snapshot of the configured schedules.
+
 ### <a id="name"></a>Name
 
 Name sets an explicit job name.
@@ -980,15 +992,41 @@ Name sets an explicit job name.
 scheduler.New().Name("cache:refresh").HourlyAt(15)
 ```
 
+### <a id="pauseall"></a>PauseAll
+
+PauseAll halts job execution without removing schedule definitions.
+
+```go
+s := scheduler.New()
+_ = s.PauseAll()
+```
+
+### <a id="pauseschedule"></a>PauseSchedule
+
+PauseSchedule pauses a schedule by id.
+
+### <a id="restartschedule"></a>RestartSchedule
+
+RestartSchedule resumes a schedule if needed, runs it immediately, and restores pause state.
+
+### <a id="resumeall"></a>ResumeAll
+
+ResumeAll restarts job execution for all schedules.
+
+```go
+s := scheduler.New()
+_ = s.ResumeAll()
+```
+
+### <a id="resumeschedule"></a>ResumeSchedule
+
+ResumeSchedule resumes a paused schedule by id.
+
 ## Runtime control
 
 ### <a id="isjobpaused"></a>IsJobPaused
 
 IsJobPaused reports whether a specific job is paused.
-
-### <a id="ispausedall"></a>IsPausedAll
-
-IsPausedAll reports whether global pause is enabled.
 
 ### <a id="observe"></a>Observe
 
@@ -1004,17 +1042,6 @@ s.Observe(scheduler.JobObserverFunc(func(event scheduler.JobEvent) {
 }))
 ```
 
-### <a id="pauseall"></a>PauseAll
-
-PauseAll pauses execution for all scheduled jobs without removing them.
-This is universal across Do, Command, and Exec jobs.
-RunNow calls are skipped while pause is active.
-
-```go
-s := scheduler.New()
-_ = s.PauseAll()
-```
-
 ### <a id="pausejob"></a>PauseJob
 
 PauseJob pauses execution for a specific scheduled job.
@@ -1024,15 +1051,6 @@ RunNow calls for that job are skipped while paused.
 s := scheduler.New()
 b := s.EverySecond().Name("heartbeat").Do(func(context.Context) error { return nil })
 _ = s.PauseJob(b.Job().ID())
-```
-
-### <a id="resumeall"></a>ResumeAll
-
-ResumeAll resumes execution for all paused jobs.
-
-```go
-s := scheduler.New()
-_ = s.ResumeAll()
 ```
 
 ### <a id="resumejob"></a>ResumeJob
