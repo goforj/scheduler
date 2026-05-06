@@ -85,6 +85,7 @@ func (execCommandRunner) Run(ctx context.Context, exe string, args []string) err
 type JobBuilder struct {
 	scheduler         SchedulerAdapter
 	state             *runtimeState
+	taskContextDecorator func(context.Context) context.Context
 	timezone          string
 	name              string
 	err               error
@@ -124,6 +125,7 @@ func newJobBuilderWithState(s SchedulerAdapter, state *runtimeState) *JobBuilder
 	return &JobBuilder{
 		scheduler:     s,
 		state:         state,
+		taskContextDecorator: func(ctx context.Context) context.Context { return ctx },
 		targetKind:    jobTargetFunction,
 		commandRunner: execCommandRunner{},
 		now:           nowFunc,
@@ -1602,6 +1604,11 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func(context.Context) error
 		}
 
 		runCtx := context.Background()
+		if j.taskContextDecorator != nil {
+			if decorated := j.taskContextDecorator(runCtx); decorated != nil {
+				runCtx = decorated
+			}
+		}
 		if hooks.Before != nil {
 			hooks.Before(runCtx)
 		}

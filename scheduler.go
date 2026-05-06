@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -94,17 +95,17 @@ func (s *Scheduler) Jobs() []gocron.Job {
 }
 
 func (s *Scheduler) Every(interval int) *FluentEvery {
-	return newJobBuilderWithState(s.s, s.JobBuilder.state).Every(interval)
+	return s.newJobBuilder().Every(interval)
 }
 
 // EveryDuration schedules a duration-based interval job builder.
 // @group Intervals
 func (s *Scheduler) EveryDuration(interval time.Duration) *JobBuilder {
-	return newJobBuilderWithState(s.s, s.JobBuilder.state).every(interval)
+	return s.newJobBuilder().every(interval)
 }
 
 func (s *Scheduler) Cron(expr string) *JobBuilder {
-	return newJobBuilderWithState(s.s, s.JobBuilder.state).Cron(expr)
+	return s.newJobBuilder().Cron(expr)
 }
 
 // GocronScheduler returns the underlying gocron scheduler for advanced integration.
@@ -112,4 +113,20 @@ func (s *Scheduler) Cron(expr string) *JobBuilder {
 // @group Interop
 func (s *Scheduler) GocronScheduler() gocron.Scheduler {
 	return s.s
+}
+
+// WithTaskContextDecorator decorates the fresh per-run task context before a scheduled
+// task executes. Returning nil preserves the original context.
+func (s *Scheduler) WithTaskContextDecorator(decorator func(context.Context) context.Context) *Scheduler {
+	if decorator == nil {
+		decorator = func(ctx context.Context) context.Context { return ctx }
+	}
+	s.JobBuilder.taskContextDecorator = decorator
+	return s
+}
+
+func (s *Scheduler) newJobBuilder() *JobBuilder {
+	builder := newJobBuilderWithState(s.s, s.JobBuilder.state)
+	builder.taskContextDecorator = s.JobBuilder.taskContextDecorator
+	return builder
 }

@@ -33,6 +33,39 @@ func TestSchedulerCronDo(t *testing.T) {
 	require.NoError(t, s.Stop())
 }
 
+func TestSchedulerWithTaskContextDecorator(t *testing.T) {
+	clock := clockwork.NewFakeClock()
+
+	s, err := NewWithError(gocron.WithClock(clock))
+	require.NoError(t, err)
+	defer func() { _ = s.Stop() }()
+
+	type ctxKey string
+	const key ctxKey = "runtime"
+
+	s.WithTaskContextDecorator(func(ctx context.Context) context.Context {
+		return context.WithValue(ctx, key, "scheduler")
+	})
+
+	got := make(chan string, 1)
+	s.EverySecond().Do(func(ctx context.Context) error {
+		if value, _ := ctx.Value(key).(string); value != "" {
+			got <- value
+		}
+		return nil
+	})
+
+	clock.Advance(time.Second)
+	require.Eventually(t, func() bool {
+		select {
+		case value := <-got:
+			return value == "scheduler"
+		default:
+			return false
+		}
+	}, 150*time.Millisecond, 10*time.Millisecond)
+}
+
 func TestPauseResumeAllUniversal(t *testing.T) {
 	clock := clockwork.NewFakeClock()
 	s, err := NewWithError(gocron.WithClock(clock))
