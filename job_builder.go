@@ -1389,7 +1389,7 @@ func (j *JobBuilder) IsJobPaused(id uuid.UUID) bool {
 // Example: observe paused-skip events
 //
 //	s := scheduler.New()
-//	s.Observe(scheduler.JobObserverFunc(func(event scheduler.JobEvent) {
+//	s.Observe(scheduler.JobObserverFunc(func(ctx context.Context, event scheduler.JobEvent) {
 //		if event.Type == scheduler.JobSkipped && event.Reason == "paused" {
 //			fmt.Println("skipped: paused")
 //		}
@@ -1572,9 +1572,15 @@ func (j *JobBuilder) location() *time.Location {
 
 func (j *JobBuilder) executeRun(jobID uuid.UUID, run func(context.Context) error, hooks taskHooks, bg bool) {
 	execFn := func() {
+		runCtx := context.Background()
+		if j.taskContextDecorator != nil {
+			if decorated := j.taskContextDecorator(runCtx); decorated != nil {
+				runCtx = decorated
+			}
+		}
 		if j.state != nil && j.state.isExecutionPaused(jobID) {
 			meta := j.JobMetadata()[jobID]
-			j.state.emit(JobEvent{
+			j.state.emit(runCtx, JobEvent{
 				Type:       JobSkipped,
 				JobID:      jobID,
 				Name:       meta.Name,
@@ -1593,7 +1599,7 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func(context.Context) error
 
 		start := time.Now()
 		if j.state != nil {
-			j.state.emit(JobEvent{
+			j.state.emit(runCtx, JobEvent{
 				Type:       JobStarted,
 				JobID:      jobID,
 				Name:       meta.Name,
@@ -1603,12 +1609,6 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func(context.Context) error
 			})
 		}
 
-		runCtx := context.Background()
-		if j.taskContextDecorator != nil {
-			if decorated := j.taskContextDecorator(runCtx); decorated != nil {
-				runCtx = decorated
-			}
-		}
 		if hooks.Before != nil {
 			hooks.Before(runCtx)
 		}
@@ -1620,7 +1620,7 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func(context.Context) error
 				hooks.OnFailure(runCtx, err)
 			}
 			if j.state != nil {
-				j.state.emit(JobEvent{
+				j.state.emit(runCtx, JobEvent{
 					Type:       JobFailed,
 					JobID:      jobID,
 					Name:       meta.Name,
@@ -1636,7 +1636,7 @@ func (j *JobBuilder) executeRun(jobID uuid.UUID, run func(context.Context) error
 				hooks.OnSuccess(runCtx)
 			}
 			if j.state != nil {
-				j.state.emit(JobEvent{
+				j.state.emit(runCtx, JobEvent{
 					Type:       JobSucceeded,
 					JobID:      jobID,
 					Name:       meta.Name,

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/goforj/scheduler/v2"
 )
@@ -11,7 +12,7 @@ func main() {
 
 	// Example: observe paused-skip events
 	s := scheduler.New()
-	s.Observe(scheduler.JobObserverFunc(func(event scheduler.JobEvent) {
+	s.Observe(scheduler.JobObserverFunc(func(_ context.Context, event scheduler.JobEvent) {
 		if event.Type == scheduler.JobSkipped && event.Reason == "paused" {
 			fmt.Println("skipped: paused")
 		}

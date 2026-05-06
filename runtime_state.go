@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"context"
 	"sort"
 	"sync"
 	"time"
@@ -36,12 +37,12 @@ type JobEvent struct {
 }
 
 type JobObserver interface {
-	OnJobEvent(event JobEvent)
+	OnJobEvent(ctx context.Context, event JobEvent)
 }
 
-type JobObserverFunc func(event JobEvent)
+type JobObserverFunc func(ctx context.Context, event JobEvent)
 
-func (f JobObserverFunc) OnJobEvent(event JobEvent) { f(event) }
+func (f JobObserverFunc) OnJobEvent(ctx context.Context, event JobEvent) { f(ctx, event) }
 
 type runtimeState struct {
 	mu         sync.RWMutex
@@ -155,12 +156,12 @@ func (s *runtimeState) addObserver(observer JobObserver) {
 	s.mu.Unlock()
 }
 
-func (s *runtimeState) emit(event JobEvent) {
+func (s *runtimeState) emit(ctx context.Context, event JobEvent) {
 	s.mu.RLock()
 	observers := append([]JobObserver(nil), s.observers...)
 	s.mu.RUnlock()
 
 	for _, observer := range observers {
-		observer.OnJobEvent(event)
+		observer.OnJobEvent(ctx, event)
 	}
 }

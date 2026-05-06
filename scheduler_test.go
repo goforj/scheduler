@@ -77,7 +77,7 @@ func TestPauseResumeAllUniversal(t *testing.T) {
 
 	var mu sync.Mutex
 	var skipped []JobEvent
-	s.Observe(JobObserverFunc(func(event JobEvent) {
+	s.Observe(JobObserverFunc(func(_ context.Context, event JobEvent) {
 		if event.Type == JobSkipped {
 			mu.Lock()
 			skipped = append(skipped, event)
