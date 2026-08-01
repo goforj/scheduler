@@ -12,7 +12,7 @@ func main() {
 
 	// Example: observe paused-skip events
 	s := scheduler.New()
-	s.Observe(scheduler.JobObserverFunc(func(_ context.Context, event scheduler.JobEvent) {
+	s.Observe(scheduler.JobObserverFunc(func(ctx context.Context, event scheduler.JobEvent) {
 		if event.Type == scheduler.JobSkipped && event.Reason == "paused" {
 			fmt.Println("skipped: paused")
 		}

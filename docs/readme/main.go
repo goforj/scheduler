@@ -131,7 +131,14 @@ func parseFuncs(root string) ([]*FuncDoc, error) {
 
 	funcs := map[string]*FuncDoc{}
 
-	for _, file := range pkg.Files {
+	fileNames := make([]string, 0, len(pkg.Files))
+	for fileName := range pkg.Files {
+		fileNames = append(fileNames, fileName)
+	}
+	sort.Strings(fileNames)
+
+	for _, fileName := range fileNames {
+		file := pkg.Files[fileName]
 		for _, decl := range file.Decls {
 			fn, ok := decl.(*ast.FuncDecl)
 			if !ok || fn.Doc == nil {
