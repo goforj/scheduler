@@ -58,24 +58,24 @@ go get github.com/redis/go-redis/v9
 ### Basic
 
 ```go
-s := scheduler.New()
-defer s.Stop()
+schedule := scheduler.New()
+defer schedule.Stop()
 
-s.EveryMinute().Name("cleanup").Do(func(context.Context) error { return runCleanup() }) // run in-process cleanup every minute
-s.DailyAt("09:00").Weekdays().Name("reports:morning").Do(func(context.Context) error { return sendMorningReport() }) // weekdays at 09:00
-s.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly
-s.Cron("*/15 * * * *").Exec("/usr/bin/env", "echo", "heartbeat") // run external executable every 15 minutes
-s.EveryFiveMinutes().WithoutOverlapping().Name("sync:inventory").Do(func(context.Context) error { return syncInventory() }) // prevent overlapping runs
-s.Cron("0 * * * *").When(func() bool { return isPrimaryNode() }).Name("rebalance").Do(func(context.Context) error { return rebalance() }) // run only when condition passes
+schedule.EveryMinute().Name("cleanup").Do(func(context.Context) error { return runCleanup() }) // run in-process cleanup every minute
+schedule.DailyAt("09:00").Weekdays().Name("reports:morning").Do(func(context.Context) error { return sendMorningReport() }) // weekdays at 09:00
+schedule.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly
+schedule.Cron("*/15 * * * *").Exec("/usr/bin/env", "echo", "heartbeat") // run external executable every 15 minutes
+schedule.EveryFiveMinutes().WithoutOverlapping().Name("sync:inventory").Do(func(context.Context) error { return syncInventory() }) // prevent overlapping runs
+schedule.Cron("0 * * * *").When(func() bool { return isPrimaryNode() }).Name("rebalance").Do(func(context.Context) error { return rebalance() }) // run only when condition passes
 ```
 
 ### Advanced (kitchen sink)
 
 ```go
-s := scheduler.New()
-defer s.Stop()
+schedule := scheduler.New()
+defer schedule.Stop()
 
-s.
+schedule.
 	Name("reports:generate").
 	Timezone("America/New_York").
 	Weekdays().
@@ -87,7 +87,7 @@ s.
 	DailyAt("10:30").
 	Do(func(context.Context) error { return generateReports() })
 
-s.
+schedule.
 	Name("reconcile:daily").
 	RunInBackground().
 	Cron("0 3 * * *").
@@ -101,33 +101,34 @@ package main
 
 import (
 	"context"
+
 	"github.com/goforj/scheduler/v2"
 )
 
 func main() {
-	s := scheduler.New()
-	defer s.Stop()
+	schedule := scheduler.New()
+	defer schedule.Stop()
 
-	s.EveryMinute().Name("cleanup").Do(func(context.Context) error { return nil }) // run cleanup every minute
-	s.DailyAt("10:30").Weekdays().Name("reports:generate").Do(func(context.Context) error { return nil }) // run reports on weekdays at 10:30
-	s.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly at midnight
+	schedule.EveryMinute().Name("cleanup").Do(func(context.Context) error { return nil }) // run cleanup every minute
+	schedule.DailyAt("10:30").Weekdays().Name("reports:generate").Do(func(context.Context) error { return nil }) // run reports on weekdays at 10:30
+	schedule.Cron("0 0 * * *").Command("reports:purge", "--force") // run app subcommand nightly at midnight
 
-	s.PrintJobsList()
+	schedule.PrintJobsList()
 }
 ```
 
 Example output:
 
 ```
-+------------------------------------------------------------------------------------------------------------------------+
-| Scheduler Jobs › (3)                                                                                                  |
-+------------------+----------+----------------+-----------------------+----------------------+--------------------------+
-| Name             | Type     | Schedule       | Handler               | Next Run             | Tags                     |
-+------------------+----------+----------------+-----------------------+----------------------+--------------------------+
-| cleanup          | function | every 1m       | main.main (anon func) | in 1m Mar 3 2:16AM  | env=local                |
-| reports:generate | function | cron 30 10 * * * | main.main (anon func) | in 8h Mar 3 10:30AM | env=local                |
-| reports:purge    | command  | cron 0 0 * * * | -                     | in 21h Mar 4 12:00AM | env=local, args="--force" |
-+------------------+----------+----------------+-----------------------+----------------------+--------------------------+
++---------------------------------------------------------------------------------------------------------------------------+
+| Scheduler Jobs › (3)                                                                                                      |
++------------------+----------+------------------+-----------------------+----------------------+---------------------------+
+| Name             | Type     | Schedule         | Handler               | Next Run             | Tags                      |
++------------------+----------+------------------+-----------------------+----------------------+---------------------------+
+| cleanup          | function | every 1m         | main.main (anon func) | in 1m Mar 3 2:16AM   | env=local                 |
+| reports:generate | function | cron 30 10 * * * | main.main (anon func) | in 8h Mar 3 10:30AM  | env=local                 |
+| reports:purge    | command  | cron 0 0 * * *   | -                     | in 21h Mar 4 12:00AM | env=local, args="--force" |
++------------------+----------+------------------+-----------------------+----------------------+---------------------------+
 ```
 
 ## Runnable examples
@@ -1104,3 +1105,14 @@ Do schedules the job with the provided task function.
 scheduler.New().Name("cleanup").Cron("0 0 * * *").Do(func(context.Context) error { return nil })
 ```
 <!-- api:embed:end -->
+
+## Development
+
+Use the repository targets so the API examples and README stay synchronized:
+
+```bash
+make test
+make test-race
+make vet
+make generate
+```
