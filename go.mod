@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/go-co-op/gocron/v2 v2.19.0
+	github.com/go-co-op/gocron/v2 v2.22.0
 	github.com/goforj/cache v0.4.0
 	github.com/goforj/cache/driver/rediscache v0.4.0
 	github.com/google/uuid v1.6.0
