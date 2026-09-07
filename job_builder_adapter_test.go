@@ -42,8 +42,8 @@ func TestWithCommandRunnerAndFailureHook(t *testing.T) {
 	s := newTestScheduler(clock)
 	defer s.Shutdown()
 
-	done := make(chan struct{})
-	runner := &stubRunner{err: fmt.Errorf("boom"), done: done}
+	failureDone := make(chan struct{})
+	runner := &stubRunner{err: fmt.Errorf("boom")}
 	var failureCalled bool
 	var failureErr error
 
@@ -52,6 +52,7 @@ func TestWithCommandRunnerAndFailureHook(t *testing.T) {
 		OnFailure(func(_ context.Context, err error) {
 			failureCalled = true
 			failureErr = err
+			close(failureDone)
 		}).
 		Cron("0 0 * * *").
 		Command("hello:world")
@@ -60,9 +61,9 @@ func TestWithCommandRunnerAndFailureHook(t *testing.T) {
 	require.NoError(t, jb.Job().RunNow())
 
 	select {
-	case <-done:
+	case <-failureDone:
 	case <-time.After(2 * time.Second):
-		t.Fatalf("command runner did not run")
+		t.Fatalf("failure hook did not run")
 	}
 
 	require.Equal(t, 1, runner.called)

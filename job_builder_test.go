@@ -466,13 +466,25 @@ type stubJob struct {
 	tags []string
 }
 
-func (j stubJob) ID() uuid.UUID                     { return j.id }
-func (j stubJob) LastRun() (time.Time, error)       { return time.Time{}, nil }
-func (j stubJob) Name() string                      { return j.name }
-func (j stubJob) NextRun() (time.Time, error)       { return time.Now(), nil }
-func (j stubJob) NextRuns(int) ([]time.Time, error) { return nil, nil }
-func (j stubJob) RunNow() error                     { return nil }
-func (j stubJob) Tags() []string                    { return j.tags }
+func (j stubJob) ID() uuid.UUID { return j.id }
+
+// IsRunning stays false because metadata fallback tests never execute the stub.
+func (j stubJob) IsRunning() (bool, error)    { return false, nil }
+func (j stubJob) LastRun() (time.Time, error) { return time.Time{}, nil }
+
+// LastRunCompletedAt stays empty because metadata fallback tests never execute the stub.
+func (j stubJob) LastRunCompletedAt() (time.Time, error) { return time.Time{}, nil }
+
+// LastRunStartedAt stays empty because metadata fallback tests never execute the stub.
+func (j stubJob) LastRunStartedAt() (time.Time, error) { return time.Time{}, nil }
+func (j stubJob) Name() string                         { return j.name }
+func (j stubJob) NextRun() (time.Time, error)          { return time.Now(), nil }
+func (j stubJob) NextRuns(int) ([]time.Time, error)    { return nil, nil }
+func (j stubJob) RunNow() error                        { return nil }
+
+// Schedule is nil because recordJob derives the tested fallback from builder state.
+func (j stubJob) Schedule() gocron.JobSchedule { return nil }
+func (j stubJob) Tags() []string               { return j.tags }
 
 func TestRecordJobFallbacks(t *testing.T) {
 	t.Setenv("APP_ENV", "test")
