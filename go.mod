@@ -1,12 +1,12 @@
 module github.com/goforj/scheduler/v2
 
-go 1.27.0
+go 1.25.0
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-co-op/gocron/v2 v2.22.0
-	github.com/goforj/cache v0.4.1
-	github.com/goforj/cache/driver/rediscache v0.4.1
+	github.com/goforj/cache v0.4.0
+	github.com/goforj/cache/driver/rediscache v0.4.0
 	github.com/google/uuid v1.6.0
 	github.com/jonboulle/clockwork v0.5.0
 	github.com/redis/go-redis/v9 v9.22.0
@@ -20,7 +20,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.8.0 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
-	github.com/goforj/cache/cachecore v0.4.1 // indirect
+	github.com/goforj/cache/cachecore v0.4.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
