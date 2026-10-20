@@ -1116,3 +1116,7 @@ make test-race
 make vet
 make generate
 ```
+
+## Documentation
+
+Read the [scheduler library documentation](https://goforj.dev/scheduler) for standalone installation, usage, and API reference.
