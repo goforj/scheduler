@@ -18,6 +18,14 @@ updates:
         update-types: [minor, patch]
   - package-ecosystem: "gomod"
     directory: "/"
+    # Preserve Go 1.25 support until a deliberate minimum-toolchain migration.
+    ignore:
+      - dependency-name: "github.com/goforj/cache"
+        versions: [">=0.4.1"] # Requires Go 1.27.
+      - dependency-name: "github.com/redis/go-redis/v9"
+        versions: [">=9.23.0"] # Requires Go 1.26.
+      - dependency-name: "golang.org/x/sys"
+        versions: [">=0.48.0"] # Requires Go 1.26.
     schedule:
       interval: monthly
     cooldown:
